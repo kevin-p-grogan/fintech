@@ -1,8 +1,8 @@
 import pandas as pd
 import yfinance as yf
 
-METADATA_FILEPATH = "data/ETF_metadata.csv"
-OUTPUT_FILEPATH = "data/ETF_data.pkl"
+METADATA_FILEPATH = "data/raw/ETF_metadata.csv"
+OUTPUT_FILEPATH = "data/raw/ETF_data.pkl"
 TICKER_SYMBOL_COLUMN = "Symbol"
 PERIOD = "5y"  # Grab data for the last 5 years
 INTERVAL = "1d"  # Grab daily data
