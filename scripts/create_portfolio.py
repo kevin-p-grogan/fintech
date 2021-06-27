@@ -16,12 +16,13 @@ PORTFOLIO_WEIGHTS_FILEPATH = os.path.join(RESULTS_FOLDER, "portfolio_weights.pkl
 # Parameters
 NUM_DAYS_TIME_HORIZON = 365
 ANALYSIS_COLUMN = "Adj Close"
+NUM_DAYS_PREDICTION_PERIOD = 30
 
 def main():
     data = pd.read_pickle(DATA_FILEPATH)
     data_munger = DataMunger(num_days_time_horizon=NUM_DAYS_TIME_HORIZON, anaysis_column=ANALYSIS_COLUMN)
     data = data_munger.preprocess(data)
-    financial_model = FinancialModel()
+    financial_model = FinancialModel(num_days_prediction_period=NUM_DAYS_PREDICTION_PERIOD)
     financial_model.train(data)
     visualizer = Visualizer(RESULTS_FOLDER)
     visualizer.make_financial_model_plots(financial_model, data)
