@@ -35,3 +35,14 @@ class DataMunger:
 
         return start_date
 
+    @staticmethod
+    def get_times_from_index(data: pd.DataFrame) -> pd.Series:
+        """Converts the dates to a fraction of a year starting at the first date."""
+        data = data.copy()
+        dates = data.index.to_series()
+        start_date = dates.min()
+        deltas = (date - start_date for date in dates)
+        days_in_year = 365.0
+        times = pd.Series([delta.days / days_in_year for delta in deltas], index=dates)
+        return times
+

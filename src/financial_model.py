@@ -4,13 +4,13 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 import numpy as np
 
+from src.data_munger import DataMunger
+
 
 class FinancialModel:
     _num_days_prediction_period: float
     _interest_rates: Optional[pd.Series]
     _covariances: Optional[pd.DataFrame]
-
-    DAYS_IN_YEAR: int = 365
 
     def __init__(self, num_days_prediction_period: float = 30):
         self._num_days_prediction_period = num_days_prediction_period
@@ -28,9 +28,9 @@ class FinancialModel:
         self._compute_interest_rates(data)
         self._compute_covariances(data)
 
-    def _compute_interest_rates(self, data: pd.DataFrame) -> pd.Series:
+    def _compute_interest_rates(self, data: pd.DataFrame):
         lr = LinearRegression(fit_intercept=False)
-        times = self._get_times_from_index(data)
+        times = DataMunger.get_times_from_index(data)
         interest_rates = []
         symbols = []
         for symbol in data:
@@ -44,23 +44,14 @@ class FinancialModel:
 
         self._interest_rates = pd.Series(interest_rates, symbols)
 
-    def _get_times_from_index(self, data: pd.DataFrame) -> pd.Series:
-        """Converts the dates to a fraction of a year starting at the first date."""
-        data = data.copy()
-        dates = data.index.to_series()
-        start_date = dates.min()
-        deltas = (date - start_date for date in dates)
-        times = pd.Series([delta.days / self.DAYS_IN_YEAR for delta in deltas], index=dates)
-        return times
-
     def _compute_covariances(self, data: pd.DataFrame):
         data = data.copy()
-        times = self._get_times_from_index(data)
-        predicted_data = self._predict(times)
+        times = DataMunger.get_times_from_index(data)
+        predicted_data = self.predict(times)
         noise = data - predicted_data
         self._covariances = noise.cov()
 
-    def _predict(self, times: pd.Series) -> pd.DataFrame:
+    def predict(self, times: pd.Series) -> pd.DataFrame:
         predicted_data = {}
         for symbol in self._interest_rates.index:
             interest_rate = self._interest_rates[symbol]
@@ -68,5 +59,12 @@ class FinancialModel:
 
         return pd.DataFrame(predicted_data)
 
+    def get_covariance(self, symbol1: str, symbol2: str) -> float:
+        if self._covariances is None:
+            raise AttributeError("Covariances are not available. Make sure to train model first.")
+        return self._covariances[symbol1][symbol2]
 
-
+    def get_interest_rate(self, symbol: str) -> float:
+        if self._interest_rates is None:
+            raise AttributeError("Interest rates are not available. Make sure to train model first.")
+        return self._interest_rates[symbol]
