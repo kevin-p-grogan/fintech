@@ -29,7 +29,7 @@ class TestFinancialModel(unittest.TestCase):
         times = np.linspace(0, 1, num_times)
         dates = TestFinancialModel._make_dates(times)
         data = pd.DataFrame({
-            p.name: np.exp(p.interest_rate * times) + p.variance**0.5 * np.random.randn(num_times) for p in params
+            p.name: np.exp(p.interest_rate * times + p.variance**0.5 * np.random.randn(num_times)) for p in params
         }, index=dates)
         return data
 

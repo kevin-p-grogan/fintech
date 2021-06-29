@@ -48,7 +48,7 @@ class FinancialModel:
         data = data.copy()
         times = DataMunger.get_times_from_index(data)
         predicted_data = self.predict(times)
-        noise = data - predicted_data
+        noise = data / predicted_data - 1.0
         self._covariances = noise.cov()
 
     def predict(self, times: pd.Series) -> pd.DataFrame:
