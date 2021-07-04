@@ -23,8 +23,8 @@ class Visualizer:
             plt.plot(times, predicted_data[symbol], 'r', label="Predictions")
             plt.xlabel("Time in Fraction of a Year")
             plt.ylabel("Prices")
-            plt.title(f"Interest Rate={model.get_interest_rate(symbol)}. "
-                      f"Variance={model.get_covariance(symbol, symbol)}.")
+            plt.title(f"Interest Rate={model.interest_rates[symbol]}. "
+                      f"Variance={model.covariances[symbol][symbol]}.")
             filename = f"financial_model_{symbol}.png"
             path = os.path.join(self._folder, filename)
             plt.savefig(path)

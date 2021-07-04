@@ -17,11 +17,32 @@ class FinancialModel:
         self._interest_rates = None
         self._covariances = None
 
-    def predict_expected_value(self, data: pd.DataFrame) -> pd.Series:
-        pass
+    def predict_yearly_return(self, portfolio_weights: np.array) -> float:
+        interest_rates_array = np.array(self.interest_rates).reshape((-1, 1))
+        weights_array = portfolio_weights.reshape((1, -1))
+        yearly_return = weights_array @ interest_rates_array
+        assert len(yearly_return) == 1
+        return yearly_return[0, 0]
 
-    def predict_covariance(self, data: pd.DataFrame) -> pd.DataFrame:
-        pass
+    def predict_yearly_return_jacobian(self) -> np.ndarray:
+        return np.array(self.interest_rates)
+
+    def predict_risk(self, portfolio_weights: np.array) -> float:
+        covariance_matrix = np.array(self.covariances)
+        weights_array = portfolio_weights.reshape((1, -1))
+        risk = weights_array @ covariance_matrix @ weights_array.T
+        assert len(risk) == 1
+        return risk[0, 0]
+
+    def predict_risk_jacobian(self, portfolio_weights: np.array) -> np.ndarray:
+        covariance_matrix = np.array(self.covariances)
+        weights_array = portfolio_weights.reshape((1, -1))
+        risk_gradient = 2 * covariance_matrix @ weights_array.T
+        return np.squeeze(risk_gradient)
+
+    @property
+    def num_assets(self) -> int:
+        return len(self.interest_rates)
 
     def train(self, data: pd.DataFrame):
         data = data.copy()
@@ -59,12 +80,14 @@ class FinancialModel:
 
         return pd.DataFrame(predicted_data)
 
-    def get_covariance(self, symbol1: str, symbol2: str) -> float:
+    @property
+    def covariances(self) -> pd.DataFrame:
         if self._covariances is None:
             raise AttributeError("Covariances are not available. Make sure to train model first.")
-        return self._covariances[symbol1][symbol2]
+        return self._covariances
 
-    def get_interest_rate(self, symbol: str) -> float:
+    @property
+    def interest_rates(self) -> pd.Series:
         if self._interest_rates is None:
             raise AttributeError("Interest rates are not available. Make sure to train model first.")
-        return self._interest_rates[symbol]
+        return self._interest_rates
