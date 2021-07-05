@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 import pandas as pd
 from sklearn.linear_model import LinearRegression
@@ -43,6 +43,10 @@ class FinancialModel:
     @property
     def num_assets(self) -> int:
         return len(self.interest_rates)
+
+    @property
+    def asset_names(self) -> List[str]:
+        return list(self.interest_rates.index)
 
     def train(self, data: pd.DataFrame):
         data = data.copy()

@@ -6,12 +6,19 @@ import numpy as np
 import pandas as pd
 
 from src.financial_model import FinancialModel
+from src.portfolio_optimizer import PortfolioOptimizer
 
 DataParameters = namedtuple("TestParameters", ["name", "interest_rate", "variance"])
 
 
 class StubBuilder:
     """Class that handles the building of test stubs"""
+    @staticmethod
+    def create_portfolio_optimzer(params: List[DataParameters]) -> PortfolioOptimizer:
+        financial_model = StubBuilder.create_financial_model(params)
+        portfolio_optimizer = PortfolioOptimizer(financial_model)
+        return portfolio_optimizer
+
     @staticmethod
     def create_financial_model(params: List[DataParameters]) -> FinancialModel:
         data = StubBuilder.create_test_data(params)
