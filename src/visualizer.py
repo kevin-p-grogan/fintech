@@ -1,4 +1,5 @@
 import os
+from typing import Sequence
 
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -30,5 +31,24 @@ class Visualizer:
             plt.savefig(path)
             plt.clf()
 
-    def make_portfolio_optimizer_plots(self, optimizer: PortfolioOptimizer, data: pd.DataFrame):
-        pass
+    def make_portfolio_optimizer_plots(
+            self,
+            optimizer: PortfolioOptimizer,
+            data: pd.DataFrame,
+            risks: Sequence[float]):
+        data = data.copy()
+        times = DataMunger.get_times_from_index(data)
+        for i, risk in enumerate(risks):
+            portfolio_weights = optimizer.get_portfolio_weights(risk)
+            portfolio = data @ portfolio_weights
+            plt.figure(i)
+            plt.plot(times, data)
+            plt.plot(times, portfolio, 'ks-', label="Portfolio")
+            plt.xlabel("Time in Fraction of a Year")
+            plt.ylabel("Prices")
+            plt.title(f"Portfolio Risk = {risk}.")
+            plt.legend(loc="best")
+            filename = f"portfolio_risk_{risk}.png"
+            path = os.path.join(self._folder, filename)
+            plt.savefig(path)
+            plt.clf()
