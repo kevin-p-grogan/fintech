@@ -10,7 +10,7 @@ from src.financial_model import FinancialModel
 
 
 class PortfolioOptimizer:
-    _model: FinancialModel
+    financial_model: FinancialModel
     _optimal_weights: Optional[pd.DataFrame]
     _optimal_results: Optional[pd.DataFrame]
     _risk_interpolator: Optional[interp1d]
@@ -19,13 +19,13 @@ class PortfolioOptimizer:
     UPPER_TRADEOFF_BOUND: float = 1.0
 
     def __init__(self, model: FinancialModel):
-        self._model = model
+        self.financial_model = model
         self._optimal_weights = None
         self._optimal_results = None
         self._risk_interpolator = None
 
     def optimize(self, num_evaluations: int = 11, verbose: bool = True):
-        num_weights = self._model.num_assets
+        num_weights = self.financial_model.num_assets
         initial_weights = np.ones((num_weights, 1)) / num_weights
         constraints = [self._portfolio_weights_sum_to_one, self._portfolio_weights_non_negative]
         tradeoff_params = np.linspace(self.LOWER_TRADEOFF_BOUND, self.UPPER_TRADEOFF_BOUND, num_evaluations)
@@ -41,20 +41,20 @@ class PortfolioOptimizer:
                 print("Finished optimization")
 
             optimal_weights.append(list(result.x))
-            risk = self._model.predict_risk(result.x)
-            yearly_return = self._model.predict_yearly_return(result.x)
+            risk = self.financial_model.predict_risk(result.x)
+            yearly_return = self.financial_model.predict_yearly_return(result.x)
             optimal_results.append([yearly_return, risk])
 
         optimal_weights = np.array(optimal_weights)
-        self._optimal_weights = pd.DataFrame(optimal_weights, index=tradeoff_params, columns=self._model.asset_names)
+        self._optimal_weights = pd.DataFrame(optimal_weights, index=tradeoff_params, columns=self.financial_model.asset_names)
         optimal_results = np.array(optimal_results)
         self._optimal_results = pd.DataFrame(optimal_results, index=tradeoff_params, columns=["Yearly Return", "Risk"])
         optimal_risks = self.optimal_results["Risk"]
-        self._risk_interpolator = interp1d(optimal_risks, self.optimal_weights, bounds_error=True, axis=0)
+        self._risk_interpolator = interp1d(optimal_risks, self.optimal_weights, axis=0)
 
     @property
     def _portfolio_weights_sum_to_one(self) -> LinearConstraint:
-        num_weights = self._model.num_assets
+        num_weights = self.financial_model.num_assets
         lower_bound = 1.0
         upper_bound = 1.0
         constraint_matrix = np.ones((1, num_weights))
@@ -62,21 +62,21 @@ class PortfolioOptimizer:
 
     @property
     def _portfolio_weights_non_negative(self) -> LinearConstraint:
-        num_weights = self._model.num_assets
+        num_weights = self.financial_model.num_assets
         lower_bound = 0.0
         upper_bound = np.inf
         constraint_matrix = np.identity(num_weights)
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 
     def _objective(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> float:
-        yearly_return = self._model.predict_yearly_return(portfolio_weights)
-        risk = self._model.predict_risk(portfolio_weights)
+        yearly_return = self.financial_model.predict_yearly_return(portfolio_weights)
+        risk = self.financial_model.predict_risk(portfolio_weights)
         obj = -tradeoff_parameter*yearly_return + (1.-tradeoff_parameter)*risk
         return obj
 
     def _objective_jacobian(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> np.ndarray:
-        yearly_return_jacobian = self._model.predict_yearly_return_jacobian()
-        risk_jacobian = self._model.predict_risk_jacobian(portfolio_weights)
+        yearly_return_jacobian = self.financial_model.predict_yearly_return_jacobian()
+        risk_jacobian = self.financial_model.predict_risk_jacobian(portfolio_weights)
         obj = -tradeoff_parameter*yearly_return_jacobian + (1.-tradeoff_parameter)*risk_jacobian
         return obj
 
@@ -112,8 +112,17 @@ class PortfolioOptimizer:
 
         self._optimal_weights.to_pickle(path)
 
-    def get_portfolio_weights(self, risk) -> pd.Series:
+    def get_portfolio_weights(self, risk: float) -> pd.Series:
+        self._check_risk(risk)
         portfolio_weight_array = self.risk_interpolator(risk)
-        portfolio_weights = pd.Series(portfolio_weight_array, index=self._model.asset_names)
+        portfolio_weights = pd.Series(portfolio_weight_array, index=self.financial_model.asset_names)
         return portfolio_weights
+
+    def _check_risk(self, risk: float):
+        min_risk = self.optimal_results["Risk"].min()
+        max_risk = self.optimal_results["Risk"].max()
+        in_bounds = min_risk <= risk <= max_risk
+        if not in_bounds:
+            raise ValueError(f"Inputted risk, {risk}, is not in bounds. "
+                             f"It must be between {min_risk} and {max_risk}.")
 
