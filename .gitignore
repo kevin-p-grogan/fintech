@@ -141,5 +141,4 @@ cython_debug/
 
 .idea
 # data files
-*.pkl
-*.csv
+data/*
