@@ -8,8 +8,7 @@ from src.financial_model import FinancialModel
 from src.portfolio_optimizer import PortfolioOptimizer
 from src.visualizer import Visualizer
 
-DATA_FILEPATH = "../data/raw/ETF_data.pkl"
-METADATA_FILEPATH = "../data/raw/ETF_metadata.csv"
+DATA_FILEPATH = "../data/raw/data.pkl"
 RESULTS_FOLDER = "../data/results"
 RISKS = list(np.logspace(-4, -2, 10))
 PORTFOLIO_WEIGHTS_FILEPATH = os.path.join(RESULTS_FOLDER, "portfolio_weights.pkl")
