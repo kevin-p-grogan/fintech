@@ -36,32 +36,33 @@ class Visualizer:
             self,
             optimizer: PortfolioOptimizer,
             data: pd.DataFrame,
-            risks: Sequence[float]):
+            volatilities: Sequence[float]):
         data = data.copy()
         times = DataMunger.get_times_from_index(data)
-        yearly_returns = []
-        for i, risk in enumerate(risks):
+        aprs = []
+        for i, volatility in enumerate(volatilities):
+            risk = optimizer.financial_model.volatility_to_risk(volatility)
             portfolio_weights = optimizer.get_portfolio_weights(risk)
             portfolio = data @ portfolio_weights
-            yearly_return = optimizer.financial_model.predict_yearly_return(np.array(portfolio_weights))
-            yearly_returns.append(yearly_return)
+            apr = optimizer.financial_model.predict_apr(np.array(portfolio_weights))
+            aprs.append(apr)
             plt.figure(i)
             plt.plot(times, data)
             plt.plot(times, portfolio, 'ks-', label="Portfolio")
             plt.xlabel("Time in Fraction of a Year")
             plt.ylabel("Prices")
-            plt.title(f"Portfolio Risk = {risk}. Portfolio Yearly Return = {yearly_return}.")
+            plt.title(f"Portfolio Volatility = {volatility}. Portfolio APR = {apr}.")
             plt.legend(loc="best")
-            filename = f"portfolio_risk_{risk}.png"
+            filename = f"portfolio_volatility_{volatility}.png"
             path = os.path.join(self._folder, filename)
             plt.savefig(path)
             plt.clf()
 
         plt.figure()
-        plt.plot(risks, yearly_returns, "ks")
-        plt.xlabel("Portfolio Risk")
-        plt.ylabel("Yearly Return")
-        filename = f"risk_return_tradeoff.png"
+        plt.plot(volatilities, aprs, "ks")
+        plt.xlabel("Portfolio Volatility")
+        plt.ylabel("APR")
+        filename = f"volatility_apr_tradeoff.png"
         path = os.path.join(self._folder, filename)
         plt.savefig(path)
         plt.clf()

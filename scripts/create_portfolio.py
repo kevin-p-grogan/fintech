@@ -10,7 +10,7 @@ from src.visualizer import Visualizer
 
 DATA_FILEPATH = "../data/raw/data.pkl"
 RESULTS_FOLDER = "../data/results"
-RISKS = list(np.logspace(-4, -2, 10))
+VOLATILITIES = list(np.logspace(-2, -1, 10))
 PORTFOLIO_WEIGHTS_FILEPATH = os.path.join(RESULTS_FOLDER, "portfolio_weights.pkl")
 
 # Parameters
@@ -30,7 +30,7 @@ def main():
     portfolio_optimizer = PortfolioOptimizer(financial_model)
     portfolio_optimizer.optimize()
     portfolio_optimizer.save_portfolio_weights(PORTFOLIO_WEIGHTS_FILEPATH)
-    visualizer.make_portfolio_optimizer_plots(portfolio_optimizer, data, RISKS)
+    visualizer.make_portfolio_optimizer_plots(portfolio_optimizer, data, VOLATILITIES)
 
 
 if __name__ == "__main__":

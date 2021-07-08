@@ -24,15 +24,24 @@ class FinancialModel:
         assert len(yearly_return) == 1
         return yearly_return[0, 0]
 
+    def predict_apr(self, portfolio_weights: np.array) -> float:
+        yearly_return = self.predict_yearly_return(portfolio_weights)
+        apr = np.exp(yearly_return) - 1.0
+        return apr
+
     def predict_yearly_return_jacobian(self) -> np.ndarray:
         return np.array(self.interest_rates)
 
-    def predict_risk(self, portfolio_weights: np.array) -> float:
+    def predict_risk(self, portfolio_weights: np.ndarray) -> float:
         covariance_matrix = np.array(self.covariances)
         weights_array = portfolio_weights.reshape((1, -1))
         risk = weights_array @ covariance_matrix @ weights_array.T
         assert len(risk) == 1
         return risk[0, 0]
+
+    @staticmethod
+    def volatility_to_risk(volatility) -> float:
+        return volatility ** 2.0
 
     def predict_risk_jacobian(self, portfolio_weights: np.array) -> np.ndarray:
         covariance_matrix = np.array(self.covariances)
