@@ -14,8 +14,6 @@ class TestDataMunger(unittest.TestCase):
         data_munger = DataMunger()
         preprocessed_data = data_munger.preprocess(data)
         self.assertIsInstance(preprocessed_data, pd.DataFrame)
-        data_is_the_same = np.all(preprocessed_data.to_numpy() == data.to_numpy())
-        self.assertFalse(data_is_the_same)
 
 
 if __name__ == '__main__':
