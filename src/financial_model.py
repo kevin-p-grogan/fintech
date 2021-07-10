@@ -25,12 +25,12 @@ class FinancialModel:
         """Computes the yearly return compounded continuously.
         Includes current portfolio weights if set during training."""
         interest_rates_array = np.array(self.interest_rates).reshape((-1, 1))
-        weights_array = self._get_weights_array(portfolio_weights)
+        weights_array = self.get_weights_array(portfolio_weights)
         yearly_return = weights_array @ interest_rates_array
         assert len(yearly_return) == 1
         return yearly_return[0, 0]
 
-    def _get_weights_array(self, portfolio_weights: np.ndarray) -> np.ndarray:
+    def get_weights_array(self, portfolio_weights: np.ndarray) -> np.ndarray:
         """Gets the normalized weights array. Includes the current portfolio weights."""
         weights_array = (portfolio_weights + self._current_portfolio_weights).reshape((1, -1))
         weights_array = weights_array / self.weights_scale
@@ -52,7 +52,7 @@ class FinancialModel:
 
     def predict_risk(self, portfolio_weights: np.ndarray) -> float:
         covariance_matrix = np.array(self.covariances)
-        weights_array = self._get_weights_array(portfolio_weights)
+        weights_array = self.get_weights_array(portfolio_weights)
         risk = weights_array @ covariance_matrix @ weights_array.T
         assert len(risk) == 1
         return risk[0, 0]
@@ -61,9 +61,13 @@ class FinancialModel:
     def volatility_to_risk(volatility) -> float:
         return volatility ** 2.0
 
+    @staticmethod
+    def risk_to_volatility(risk) -> float:
+        return risk ** 0.5
+
     def predict_risk_jacobian(self, portfolio_weights: np.array) -> np.ndarray:
         covariance_matrix = np.array(self.covariances)
-        weights_array = self._get_weights_array(portfolio_weights)
+        weights_array = self.get_weights_array(portfolio_weights)
         risk_gradient = 2 * covariance_matrix @ weights_array.T / self.weights_scale
         return np.squeeze(risk_gradient)
 

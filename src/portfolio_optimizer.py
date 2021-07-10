@@ -17,6 +17,7 @@ class PortfolioOptimizer:
 
     LOWER_TRADEOFF_BOUND: float = 0.0
     UPPER_TRADEOFF_BOUND: float = 1.0
+    EPS: float = 1.0e-6
 
     def __init__(self, model: FinancialModel):
         self.financial_model = model
@@ -114,8 +115,10 @@ class PortfolioOptimizer:
 
     def get_portfolio_weights(self, risk: float) -> pd.Series:
         self._check_risk(risk)
-        portfolio_weight_array = self.risk_interpolator(risk)
-        portfolio_weights = pd.Series(portfolio_weight_array, index=self.financial_model.asset_names)
+        interpolated_weights = self.risk_interpolator(risk)
+        weights_array = self.financial_model.get_weights_array(interpolated_weights)
+        weights_array = np.squeeze(weights_array)
+        portfolio_weights = pd.Series(weights_array, index=self.financial_model.asset_names)
         return portfolio_weights
 
     def _check_risk(self, risk: float):
@@ -125,4 +128,18 @@ class PortfolioOptimizer:
         if not in_bounds:
             raise ValueError(f"Inputted risk, {risk}, is not in bounds. "
                              f"It must be between {min_risk} and {max_risk}.")
+
+    @property
+    def min_volatility(self) -> float:
+        min_risk = self.optimal_results["Risk"].min()
+        min_volatility = self.financial_model.risk_to_volatility(min_risk)
+        stable_min_volatility = min_volatility + self.EPS
+        return stable_min_volatility
+
+    @property
+    def max_volatility(self) -> float:
+        max_risk = self.optimal_results["Risk"].max()
+        max_volatility = self.financial_model.risk_to_volatility(max_risk)
+        stable_max_volatility = max_volatility - self.EPS
+        return stable_max_volatility
 

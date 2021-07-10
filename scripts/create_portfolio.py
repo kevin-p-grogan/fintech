@@ -1,7 +1,6 @@
 import os
 
 import pandas as pd
-import numpy as np
 
 from src.data_munger import DataMunger
 from src.financial_model import FinancialModel
@@ -11,7 +10,6 @@ from src.visualizer import Visualizer
 DATA_FILEPATH = "../data/raw/data.pkl"
 PORTFOLIO_DATA_FILEPATH = "../data/raw/portfolio.txt"
 RESULTS_FOLDER = "../data/results"
-VOLATILITIES = list(np.logspace(-2, -1, 5))
 PORTFOLIO_WEIGHTS_FILEPATH = os.path.join(RESULTS_FOLDER, "portfolio_weights.pkl")
 
 # Parameters
@@ -33,7 +31,7 @@ def main():
     portfolio_optimizer = PortfolioOptimizer(financial_model)
     portfolio_optimizer.optimize()
     portfolio_optimizer.save_portfolio_weights(PORTFOLIO_WEIGHTS_FILEPATH)
-    visualizer.make_portfolio_optimizer_plots(portfolio_optimizer, data, VOLATILITIES)
+    visualizer.make_portfolio_optimizer_plots(portfolio_optimizer, data)
 
 
 if __name__ == "__main__":

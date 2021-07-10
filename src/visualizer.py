@@ -1,5 +1,4 @@
 import os
-from typing import Sequence
 
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -36,10 +35,11 @@ class Visualizer:
             self,
             optimizer: PortfolioOptimizer,
             data: pd.DataFrame,
-            volatilities: Sequence[float]):
+            num_volatilities: int = 10):
         data = data.copy()
         times = DataMunger.get_times_from_index(data)
         aprs = []
+        volatilities = np.linspace(optimizer.min_volatility, optimizer.max_volatility, num_volatilities)
         for i, volatility in enumerate(volatilities):
             risk = optimizer.financial_model.volatility_to_risk(volatility)
             portfolio_weights = optimizer.get_portfolio_weights(risk)
@@ -51,9 +51,9 @@ class Visualizer:
             plt.plot(times, portfolio, 'ks-', label="Portfolio")
             plt.xlabel("Time in Fraction of a Year")
             plt.ylabel("Prices")
-            plt.title(f"Portfolio Volatility = {volatility}. Portfolio APR = {apr}.")
+            plt.title(f"Portfolio Volatility = {volatility:1.3f}. Portfolio APR = {apr:1.3f}.")
             plt.legend(loc="best")
-            filename = f"portfolio_volatility_{volatility}.png"
+            filename = f"portfolio_volatility_{volatility:1.3f}_apr_{apr:1.3f}.png"
             path = os.path.join(self._folder, filename)
             plt.savefig(path)
             plt.clf()

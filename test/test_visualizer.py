@@ -28,12 +28,9 @@ class TestVisualizer(unittest.TestCase):
         data = StubBuilder.create_test_data(params)
         portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
         portfolio_optimizer.optimize()
-        max_risk = portfolio_optimizer.optimal_results["Risk"].max() - 1.e-6
-        min_risk = portfolio_optimizer.optimal_results["Risk"].min() + 1.e-6
-        volatilities = list(np.sqrt(np.linspace(min_risk, max_risk, 3)))
         with TemporaryDirectory(dir="resources") as tmp_dir:
             visualizer = Visualizer(folder=tmp_dir)
-            visualizer.make_portfolio_optimizer_plots(portfolio_optimizer, data, volatilities)
+            visualizer.make_portfolio_optimizer_plots(portfolio_optimizer, data)
             num_images = len(os.listdir(tmp_dir))
             self.assertGreater(num_images, 0)
 
