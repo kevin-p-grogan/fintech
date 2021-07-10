@@ -11,7 +11,7 @@ from src.visualizer import Visualizer
 DATA_FILEPATH = "../data/raw/data.pkl"
 PORTFOLIO_DATA_FILEPATH = "../data/raw/portfolio.txt"
 RESULTS_FOLDER = "../data/results"
-VOLATILITIES = list(np.logspace(-2, -1, 10))
+VOLATILITIES = list(np.logspace(-2, -1, 5))
 PORTFOLIO_WEIGHTS_FILEPATH = os.path.join(RESULTS_FOLDER, "portfolio_weights.pkl")
 
 # Parameters

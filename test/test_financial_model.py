@@ -45,6 +45,7 @@ class TestFinancialModel(unittest.TestCase):
         params = [DataParameters("test1", 1.2, 0.02)]
         financial_model = StubBuilder.create_financial_model(params)
         portfolio_weights = np.array([1])
+        financial_model._current_portfolio_weights = np.array([10.0])
         yearly_return1 = financial_model.predict_yearly_return(portfolio_weights)
         yearly_return2 = financial_model.predict_yearly_return(portfolio_weights + self.EPS)
         finite_difference_jacobian = (yearly_return2 - yearly_return1) / self.EPS
@@ -71,6 +72,7 @@ class TestFinancialModel(unittest.TestCase):
         params = [DataParameters("test1", 1.2, 0.02)]
         financial_model = StubBuilder.create_financial_model(params)
         portfolio_weights = np.array([1])
+        financial_model._current_portfolio_weights = np.array([10.0])
         risk1 = financial_model.predict_risk(portfolio_weights)
         risk2 = financial_model.predict_risk(portfolio_weights + self.EPS)
         finite_difference_jacobian = (risk2 - risk1) / self.EPS
