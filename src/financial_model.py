@@ -11,11 +11,15 @@ class FinancialModel:
     _num_days_prediction_period: float
     _interest_rates: Optional[pd.Series]
     _covariances: Optional[pd.DataFrame]
+    _current_portfolio_weights = Optional[np.ndarray]
+
+    PORTFOLIO_VALUE_COLUMN: str = "Equity"
 
     def __init__(self, num_days_prediction_period: float = 30):
         self._num_days_prediction_period = num_days_prediction_period
         self._interest_rates = None
         self._covariances = None
+        self._current_portfolio_weights = None
 
     def predict_yearly_return(self, portfolio_weights: np.array) -> float:
         interest_rates_array = np.array(self.interest_rates).reshape((-1, 1))
@@ -57,10 +61,19 @@ class FinancialModel:
     def asset_names(self) -> List[str]:
         return list(self.interest_rates.index)
 
-    def train(self, data: pd.DataFrame):
+    def train(self, data: pd.DataFrame, portfolio_data: Optional[pd.DataFrame] = None,
+              investment_amount: Optional[float] = None):
         data = data.copy()
         self._compute_interest_rates(data)
         self._compute_covariances(data)
+        self._current_portfolio_weights = np.zeros_like(self.interest_rates)
+        if portfolio_data is not None and investment_amount is not None:
+            print(f"Incorporating current portfolio into calculations.")
+            self._current_portfolio_weights = self._compute_current_portfolio_weights(portfolio_data, investment_amount)
+        elif portfolio_data is None and investment_amount is None:
+            print("No current portfolio data inputted. Not incorporating current investments.")
+        else:
+            raise ValueError("Portfolio data and investment amount must be defined to incorporate current portfolio.")
 
     def _compute_interest_rates(self, data: pd.DataFrame):
         lr = LinearRegression(fit_intercept=False)
@@ -85,6 +98,27 @@ class FinancialModel:
         noise = data / predicted_data - 1.0
         self._covariances = noise.cov()
 
+    def _compute_current_portfolio_weights(self, portfolio_data: pd.DataFrame, investment_amount: float) -> np.ndarray:
+        symbols = self._get_current_portfolio_symbols(portfolio_data)
+        values = portfolio_data.loc[symbols, self.PORTFOLIO_VALUE_COLUMN]
+        values /= investment_amount
+        current_portfolio_weights = pd.Series(np.zeros_like(self.asset_names, dtype=np.float), index=self.asset_names)
+        current_portfolio_weights[symbols] = values
+        return current_portfolio_weights.to_numpy()
+
+    def _get_current_portfolio_symbols(self, portfolio_data: pd.DataFrame) -> set:
+        trained_symbols = set(self.asset_names)
+        portfolio_symbols = set(portfolio_data.index)
+        removed_symbols = set()
+        for portfolio_symbol in portfolio_symbols:
+            if portfolio_symbol not in trained_symbols:
+                print(f"WARNING: {portfolio_symbol} symbol not found in the training data."
+                      f" Will not be included in analysis.")
+                removed_symbols.add(portfolio_symbol)
+
+        symbols = portfolio_symbols.difference(removed_symbols)
+        return symbols
+
     def predict(self, times: pd.Series) -> pd.DataFrame:
         predicted_data = {}
         for symbol in self._interest_rates.index:
@@ -104,3 +138,9 @@ class FinancialModel:
         if self._interest_rates is None:
             raise AttributeError("Interest rates are not available. Make sure to train model first.")
         return self._interest_rates
+
+    @property
+    def current_portfolio_weights(self) -> pd.Series:
+        if self._current_portfolio_weights is None:
+            raise AttributeError("Current portfolio weights are not available. Make sure to train model first.")
+        return self._current_portfolio_weights

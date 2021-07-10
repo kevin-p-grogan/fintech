@@ -3,9 +3,12 @@ import unittest
 import numpy as np
 
 from stub_builder import StubBuilder, DataParameters
+from src.data_munger import DataMunger
 
 
 class TestFinancialModel(unittest.TestCase):
+    _portfolio_data_filepath = "resources/test_portfolio.txt"
+
     EPS: float = 1.e-6
 
     def test_train_interest_rates(self):
@@ -73,6 +76,19 @@ class TestFinancialModel(unittest.TestCase):
         finite_difference_jacobian = (risk2 - risk1) / self.EPS
         predicted_jacobian = financial_model.predict_risk_jacobian(portfolio_weights)
         self.assertTrue(np.isclose(finite_difference_jacobian, predicted_jacobian, rtol=1.e-3))
+
+    def test_compute_current_portfolio_weights(self):
+        params = [
+            DataParameters("TEST1", 0.1, 1.e-3),
+            DataParameters("TEST3", 0.2, 2.e-3)
+        ]
+        financial_model = StubBuilder.create_financial_model(params)
+        data_munger = DataMunger()
+        portfolio_data = data_munger.load_portfolio_data(self._portfolio_data_filepath)
+        current_portfolio_weights = financial_model._compute_current_portfolio_weights(portfolio_data, 10.0)
+        self.assertIsInstance(current_portfolio_weights, np.ndarray)
+        self.assertGreater(current_portfolio_weights.sum(), 1.0)
+        self.assertEqual(len(current_portfolio_weights), len(financial_model._interest_rates))
 
 
 if __name__ == '__main__':
