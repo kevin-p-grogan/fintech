@@ -8,15 +8,13 @@ from src.data_munger import DataMunger
 
 
 class FinancialModel:
-    _num_days_prediction_period: float
     _interest_rates: Optional[pd.Series]
     _covariances: Optional[pd.DataFrame]
     _current_portfolio_weights = Optional[np.ndarray]
 
     PORTFOLIO_VALUE_COLUMN: str = "Equity"
 
-    def __init__(self, num_days_prediction_period: float = 30):
-        self._num_days_prediction_period = num_days_prediction_period
+    def __init__(self):
         self._interest_rates = None
         self._covariances = None
         self._current_portfolio_weights = None
@@ -32,7 +30,7 @@ class FinancialModel:
 
     def get_weights_array(self, portfolio_weights: np.ndarray) -> np.ndarray:
         """Gets the normalized weights array. Includes the current portfolio weights."""
-        weights_array = (portfolio_weights + self._current_portfolio_weights).reshape((1, -1))
+        weights_array = (portfolio_weights + self.current_portfolio_weights).reshape((1, -1))
         weights_array = weights_array / self.weights_scale
         return weights_array
 
@@ -158,7 +156,25 @@ class FinancialModel:
         return self._interest_rates
 
     @property
-    def current_portfolio_weights(self) -> pd.Series:
+    def current_portfolio_weights(self) -> np.ndarray:
         if self._current_portfolio_weights is None:
             raise AttributeError("Current portfolio weights are not available. Make sure to train model first.")
         return self._current_portfolio_weights
+
+    def remove_current_portfolio_weights(self, portfolio_weights: pd.Series) -> pd.Series:
+        self._check_portfolio(portfolio_weights)
+        current_weights = pd.Series(self.current_portfolio_weights, index=self.asset_names)
+        scaled_current_weights = current_weights / self.weights_scale
+        portfolio_update = portfolio_weights - scaled_current_weights
+        portfolio_update /= portfolio_update.sum()
+        return portfolio_update
+
+    @staticmethod
+    def _check_portfolio(portfolio: pd.Series):
+        eps = 1.e-6
+        portfolio_doesnt_sum_to_one = not np.isclose(portfolio.sum(), 1.0, atol=eps)
+        negative_assets_exist = np.any(portfolio < -eps)  # assume no negative assets for now
+        if portfolio_doesnt_sum_to_one or negative_assets_exist:
+            raise ValueError(f"Invalid portfolio found. "
+                             f"Ensure that the portfolio contains only positive assets and that all values sum to one")
+

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -35,7 +36,8 @@ class Visualizer:
             self,
             optimizer: PortfolioOptimizer,
             data: pd.DataFrame,
-            num_volatilities: int = 10):
+            num_volatilities: int = 10,
+            price_limits: Optional[list[float]] = None):
         data = data.copy()
         times = DataMunger.get_times_from_index(data)
         aprs = []
@@ -46,7 +48,6 @@ class Visualizer:
             portfolio = data @ portfolio_weights
             apr = optimizer.financial_model.predict_apr(np.array(portfolio_weights))
             aprs.append(apr)
-            plt.figure(i)
             plt.plot(times, data)
             plt.plot(times, portfolio, 'ks-', label="Portfolio")
             plt.xlabel("Time in Fraction of a Year")
@@ -54,12 +55,13 @@ class Visualizer:
             plt.title(f"Portfolio Volatility = {volatility:1.3f}. Portfolio APR = {apr:1.3f}.")
             plt.legend(loc="best")
             filename = f"portfolio_volatility_{volatility:1.3f}_apr_{apr:1.3f}.png"
+            plt.ylim(price_limits) if price_limits else None
             path = os.path.join(self._folder, filename)
             plt.savefig(path)
             plt.clf()
 
         plt.figure()
-        plt.plot(volatilities, aprs, "ks")
+        plt.plot(volatilities, aprs, "ks-")
         plt.xlabel("Portfolio Volatility")
         plt.ylabel("APR")
         filename = f"volatility_apr_tradeoff.png"
