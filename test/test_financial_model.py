@@ -27,6 +27,13 @@ class TestFinancialModel(unittest.TestCase):
         predicted_variance = financial_model._covariances.to_numpy()[0, 0]
         self.assertTrue(np.isclose(predicted_variance, variance, rtol=0.1))
 
+    def test_minimum_risk(self):
+        minimum_variance = 0.01
+        params = [DataParameters("test1", 0.0, minimum_variance), DataParameters("test2", 0.0, 2.0*minimum_variance)]
+        financial_model = StubBuilder.create_financial_model(params)
+        predicted_minimum_risk = financial_model.minimum_risk
+        self.assertTrue(np.isclose(predicted_minimum_risk, minimum_variance, rtol=0.1))
+
     def test_predict_yearly_return(self):
         params = [DataParameters("test1", 1.0, 0.0), DataParameters("test2", 0.0, 0.0)]
         financial_model = StubBuilder.create_financial_model(params)

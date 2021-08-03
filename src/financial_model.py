@@ -8,16 +8,12 @@ from src.data_munger import DataMunger
 
 
 class FinancialModel:
-    _interest_rates: Optional[pd.Series]
-    _covariances: Optional[pd.DataFrame]
-    _current_portfolio_weights = Optional[np.ndarray]
+    _interest_rates: Optional[pd.Series] = None
+    _covariances: Optional[pd.DataFrame] = None
+    _current_portfolio_weights: Optional[np.ndarray] = None
+    _minimum_risk: Optional[float] = None
 
     PORTFOLIO_VALUE_COLUMN: str = "Equity"
-
-    def __init__(self):
-        self._interest_rates = None
-        self._covariances = None
-        self._current_portfolio_weights = None
 
     def predict_yearly_return(self, portfolio_weights: np.array) -> float:
         """Computes the yearly return compounded continuously.
@@ -113,6 +109,7 @@ class FinancialModel:
         predicted_data = self.predict(times)
         noise = data / predicted_data - 1.0
         self._covariances = noise.cov()
+        self._minimum_risk = np.min(np.linalg.eigvals(self._covariances))
 
     def _compute_current_portfolio_weights(self, portfolio_data: pd.DataFrame, investment_amount: float) -> np.ndarray:
         symbols = self._get_current_portfolio_symbols(portfolio_data)
@@ -178,3 +175,15 @@ class FinancialModel:
             raise ValueError(f"Invalid portfolio found. "
                              f"Ensure that the portfolio contains only positive assets and that all values sum to one")
 
+    @property
+    def maximum_yearly_return(self) -> float:
+        max_portfolio_weights = np.zeros_like(self.interest_rates)
+        max_interest_index = np.argmax(self.interest_rates)
+        max_portfolio_weights[max_interest_index] = 1.0
+        return self.predict_yearly_return(max_portfolio_weights)
+
+    @property
+    def minimum_risk(self) -> float:
+        if self._minimum_risk is None:
+            raise AttributeError("Minimum risk of portfolio are not available. Make sure to train model first.")
+        return self._minimum_risk

@@ -11,6 +11,7 @@ from src.financial_model import FinancialModel
 
 class PortfolioOptimizer:
     financial_model: FinancialModel
+    _sparsity_importance: float
     _optimal_weights: Optional[pd.DataFrame]
     _optimal_results: Optional[pd.DataFrame]
     _risk_interpolator: Optional[interp1d]
@@ -19,8 +20,9 @@ class PortfolioOptimizer:
     UPPER_TRADEOFF_BOUND: float = 1.0
     EPS: float = 1.0e-6
 
-    def __init__(self, model: FinancialModel):
+    def __init__(self, model: FinancialModel, sparsity_importance: float = 0.1):
         self.financial_model = model
+        self._sparsity_importance = sparsity_importance
         self._optimal_weights = None
         self._optimal_results = None
         self._risk_interpolator = None
@@ -34,7 +36,7 @@ class PortfolioOptimizer:
         optimal_results = []
         for i, tradeoff_param in enumerate(tradeoff_params):
             if verbose:
-                print(f"Beginning optimization for tradeoff parameter = {tradeoff_param}. {i+1} of {num_evaluations}")
+                print(f"Beginning optimization for tradeoff parameter = {tradeoff_param}. {i + 1} of {num_evaluations}")
 
             result = minimize(self._objective, initial_weights,
                               jac=self._objective_jacobian, args=(tradeoff_param,), constraints=constraints)
@@ -47,7 +49,8 @@ class PortfolioOptimizer:
             optimal_results.append([yearly_return, risk])
 
         optimal_weights = np.array(optimal_weights)
-        self._optimal_weights = pd.DataFrame(optimal_weights, index=tradeoff_params, columns=self.financial_model.asset_names)
+        self._optimal_weights = pd.DataFrame(optimal_weights, index=tradeoff_params,
+                                             columns=self.financial_model.asset_names)
         optimal_results = np.array(optimal_results)
         self._optimal_results = pd.DataFrame(optimal_results, index=tradeoff_params, columns=["Yearly Return", "Risk"])
         optimal_risks = self.optimal_results["Risk"]
@@ -72,14 +75,36 @@ class PortfolioOptimizer:
     def _objective(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> float:
         yearly_return = self.financial_model.predict_yearly_return(portfolio_weights)
         risk = self.financial_model.predict_risk(portfolio_weights)
-        obj = -tradeoff_parameter*yearly_return + (1.-tradeoff_parameter)*risk
+        obj = -tradeoff_parameter * yearly_return + (
+                    1. - tradeoff_parameter) * risk + self.sparsity_weight * self._entropy(portfolio_weights)
         return obj
+
+    @property
+    def sparsity_weight(self) -> float:
+        """Weighs the sparsity of the profile in consideration of the number of assets and the current returns"""
+        max_objective = max(self.financial_model.maximum_yearly_return, self.financial_model.minimum_risk)
+        min_objective = min(self.financial_model.maximum_yearly_return, self.financial_model.minimum_risk)
+        objective_scale = max_objective - min_objective
+        entropy_scale = np.log(self.financial_model.num_assets)
+        return self._sparsity_importance * objective_scale / entropy_scale
+
+    @staticmethod
+    def _entropy(probabilities: np.ndarray) -> float:
+        smoothed_probabilities = probabilities + PortfolioOptimizer.EPS
+        return float(np.sum(smoothed_probabilities * np.log(smoothed_probabilities)))
 
     def _objective_jacobian(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> np.ndarray:
         yearly_return_jacobian = self.financial_model.predict_yearly_return_jacobian()
         risk_jacobian = self.financial_model.predict_risk_jacobian(portfolio_weights)
-        obj = -tradeoff_parameter*yearly_return_jacobian + (1.-tradeoff_parameter)*risk_jacobian
+        obj = -tradeoff_parameter * yearly_return_jacobian + (
+                    1. - tradeoff_parameter) * risk_jacobian + self.sparsity_weight * self._entropy_jacobian(
+            portfolio_weights)
         return obj
+
+    @staticmethod
+    def _entropy_jacobian(probabilities: np.ndarray) -> np.ndarray:
+        smoothed_probabilities = probabilities + PortfolioOptimizer.EPS
+        return 1.0 + np.log(smoothed_probabilities)
 
     @property
     def optimal_weights(self) -> pd.DataFrame:
@@ -157,4 +182,3 @@ class PortfolioOptimizer:
         max_volatility = self.financial_model.risk_to_volatility(max_risk)
         stable_max_volatility = max_volatility - self.EPS
         return stable_max_volatility
-

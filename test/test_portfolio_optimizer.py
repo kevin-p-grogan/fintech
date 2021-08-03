@@ -31,6 +31,17 @@ class TestPortfolioOptimizer(unittest.TestCase):
         predicted = predicted_jacobian.sum()
         self.assertTrue(np.isclose(finite_difference, predicted, rtol=1.e-3))
 
+    def test_entropy_jacobian(self):
+        params = [DataParameters("test1", 0.15, 0.04), DataParameters("test2", -0.05, 0.02)]
+        portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
+        portfolio_weights = np.array([0.3, 0.7])
+        entropy1 = portfolio_optimizer._entropy(portfolio_weights)
+        entropy2 = portfolio_optimizer._entropy(portfolio_weights + self.EPS)
+        finite_difference = (entropy2 - entropy1) / self.EPS
+        predicted_jacobian = portfolio_optimizer._entropy_jacobian(portfolio_weights)
+        predicted = predicted_jacobian.sum()
+        self.assertTrue(np.isclose(finite_difference, predicted, rtol=1.e-3))
+
     def test_get_portfolio_weights(self):
         variance = 0.01
         params = [DataParameters("test1", 0.1, variance), DataParameters("test2", -0.3, 0.05)]
