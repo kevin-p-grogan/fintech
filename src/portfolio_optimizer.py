@@ -182,3 +182,9 @@ class PortfolioOptimizer:
         max_volatility = self.financial_model.risk_to_volatility(max_risk)
         stable_max_volatility = max_volatility - self.EPS
         return stable_max_volatility
+
+    def compute_apr_from_volatility(self, volatility: float) -> float:
+        risk = self.financial_model.volatility_to_risk(volatility)
+        portfolio_weights = self.get_portfolio_weights(risk)
+        apr = self.financial_model.predict_apr(np.array(portfolio_weights))
+        return apr
