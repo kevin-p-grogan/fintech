@@ -2,6 +2,7 @@ from typing import Optional, List
 
 import pandas as pd
 from sklearn.linear_model import LinearRegression
+from sklearn.covariance import GraphicalLassoCV
 import numpy as np
 
 from src.data_munger import DataMunger
@@ -108,7 +109,14 @@ class FinancialModel:
         times = DataMunger.get_times_from_index(data)
         predicted_data = self.predict(times)
         noise = data / predicted_data - 1.0
-        self._covariances = noise.cov()
+        try:
+            covariances = GraphicalLassoCV().fit(noise).covariance_
+            covariances = pd.DataFrame(covariances, index=noise.columns, columns=noise.columns)
+        except Exception as e:
+            print(f"WARNING: Graphical Lasso failed with exception '{e}'. Resorting to sample covariance.")
+            covariances = noise.cov()
+
+        self._covariances = covariances
         self._minimum_risk = np.min(np.linalg.eigvals(self._covariances))
 
     def _compute_current_portfolio_weights(self, portfolio_data: pd.DataFrame, investment_amount: float) -> np.ndarray:
