@@ -128,20 +128,23 @@ class PortfolioOptimizer:
             raise AttributeError(f"{property_name} was not found. "
                                  "Ensure that the PortfolioOptimizer has been optimized.")
 
-    def save_portfolio_update(self, path: str, volatility: float, metadata_path: Optional[str] = None):
-        risk = self.financial_model.volatility_to_risk(volatility)
-        portfolio_weights = self.get_portfolio_weights(risk)
-        portfolio_weights = self.financial_model.remove_current_portfolio_weights(portfolio_weights)
-        portfolio = portfolio_weights
+    def save_portfolio_update(self, path: str, portfolio_update: pd.Series, metadata_path: Optional[str] = None):
+        portfolio = portfolio_update
         if metadata_path is not None:
             metadata_path = self._check_filepath(metadata_path)
             portfolio = pd.read_csv(metadata_path)
             portfolio = portfolio.set_index("Symbol")
-            portfolio["Weights"] = portfolio_weights
+            portfolio["Weights"] = portfolio_update
 
         path = self._check_filepath(path)
         portfolio = portfolio.sort_values(by="Weights", ascending=False)
         portfolio.to_csv(path)
+
+    def get_portfolio_update(self, volatility) -> pd.Series:
+        risk = self.financial_model.volatility_to_risk(volatility)
+        portfolio_weights = self.get_portfolio_weights(risk)
+        portfolio_weights = self.financial_model.remove_current_portfolio_weights(portfolio_weights)
+        return portfolio_weights
 
     @staticmethod
     def _check_filepath(path: str):

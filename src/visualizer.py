@@ -78,3 +78,17 @@ class Visualizer:
             path = os.path.join(self._folder, filename)
             plt.savefig(path)
             plt.clf()
+
+    def make_portfolio_update_plot(self, portfolio_update: pd.Series, num_assets_plotted: int = 10):
+        sorted_update = portfolio_update.sort_values(ascending=False)
+        filtered_update = sorted_update.iloc[:num_assets_plotted]
+        filtered_update["Other"] = sorted_update.iloc[num_assets_plotted:].sum()
+        plt.bar(filtered_update.index, filtered_update, color='maroon',
+                width=0.4)
+        plt.xlabel("Symbol")
+        plt.ylabel("Percentages")
+        plt.title("Portfolio Update Weights")
+        filename = "portfolio_update_weights.png"
+        path = os.path.join(self._folder, filename)
+        plt.savefig(path)
+        plt.clf()

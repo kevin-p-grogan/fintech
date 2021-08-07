@@ -3,6 +3,7 @@ import unittest
 from tempfile import TemporaryDirectory
 
 import numpy as np
+import pandas as pd
 
 from src.visualizer import Visualizer
 from stub_builder import StubBuilder, DataParameters
@@ -33,6 +34,21 @@ class TestVisualizer(unittest.TestCase):
             visualizer.make_portfolio_optimizer_plots(portfolio_optimizer, data)
             num_images = len(os.listdir(tmp_dir))
             self.assertGreater(num_images, 0)
+
+    def test_make_portfolio_update_plot(self):
+        num_assets = 100
+        x = np.linspace(0, 1, num_assets)
+        decay = 10
+        update_array = np.exp(-decay*x)
+        update_array /= np.sum(update_array)
+        index = [f"test{i}" for i in range(num_assets)]
+        portfolio_update = pd.Series(update_array, index)
+        with TemporaryDirectory(dir="resources") as tmp_dir:
+            visualizer = Visualizer(folder=tmp_dir)
+            visualizer.make_portfolio_update_plot(portfolio_update)
+            num_images = len(os.listdir(tmp_dir))
+            self.assertGreater(num_images, 0)
+
 
 
 if __name__ == '__main__':

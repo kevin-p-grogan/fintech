@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 
 from src.data_munger import DataMunger
@@ -16,6 +18,7 @@ NUM_DAYS_TIME_HORIZON = 365 / 2.0
 ANALYSIS_COLUMN = "Adj Close"
 INVESTMENT_AMOUNT = 1000.  # [$]
 PORTFOLIO_VOLATILITY = 0.02
+SPARSITY_IMPORTANCE = 0.2
 
 # Plotting
 price_limits = [0.6, 1.4]
@@ -32,10 +35,12 @@ def main():
     financial_model.train(data, portfolio_data=portfolio_data, investment_amount=INVESTMENT_AMOUNT)
     visualizer = Visualizer(paths.plots)
     visualizer.make_financial_model_plots(financial_model, data)
-    portfolio_optimizer = PortfolioOptimizer(financial_model)
+    portfolio_optimizer = PortfolioOptimizer(financial_model, sparsity_importance=SPARSITY_IMPORTANCE)
     portfolio_optimizer.optimize()
     visualizer.make_portfolio_optimizer_plots(portfolio_optimizer, data, price_limits=price_limits)
-    portfolio_optimizer.save_portfolio_update(paths.data.portfolio_weights, PORTFOLIO_VOLATILITY, METADATA_FILE_PATH)
+    portfolio_update = portfolio_optimizer.get_portfolio_update(PORTFOLIO_VOLATILITY)
+    visualizer.make_portfolio_update_plot(portfolio_update)
+    portfolio_optimizer.save_portfolio_update(paths.data.portfolio_weights, portfolio_update, METADATA_FILE_PATH)
 
 
 if __name__ == "__main__":
