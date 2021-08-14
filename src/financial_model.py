@@ -15,6 +15,7 @@ class FinancialModel:
     _minimum_risk: Optional[float] = None
 
     PORTFOLIO_VALUE_COLUMN: str = "Equity"
+    EPS: float = 1.0e-6
 
     def predict_yearly_return(self, portfolio_weights: np.array) -> float:
         """Computes the yearly return compounded continuously.
@@ -89,26 +90,40 @@ class FinancialModel:
             raise ValueError("Portfolio data and investment amount must be defined to incorporate current portfolio.")
 
     def _compute_interest_rates(self, data: pd.DataFrame):
-        lr = LinearRegression(fit_intercept=False)
         times = DataMunger.get_times_from_index(data)
         interest_rates = []
         symbols = []
         for symbol in data:
             prices = data[symbol]
-            price_array = prices.to_numpy()
-            time_array = times.to_numpy().reshape(-1, 1)
-            lr.fit(time_array, np.log(price_array))
-            interest_rate = lr.coef_[0]
+            interest_rate = self._find_interest_rate(times, prices)
             interest_rates.append(interest_rate)
             symbols.append(symbol)
 
         self._interest_rates = pd.Series(interest_rates, symbols)
 
+    def _find_interest_rate(self, times: pd.Series, prices: pd.Series) -> float:
+        """Computes interest rates according to geometric Brownian motion."""
+        lr = LinearRegression(fit_intercept=False)
+        price_array = prices.to_numpy()
+        price_array = (price_array / price_array[0])[1:]
+        time_array = times.to_numpy()
+        time_array = (time_array - time_array[0])[1:]
+        price_array = price_array[time_array > 0]
+        time_array = time_array[time_array > 0]
+        scaled_time = time_array ** 0.5
+        time_scaled_log_prices = np.log(price_array) / scaled_time
+        lr.fit(scaled_time.reshape(-1, 1), time_scaled_log_prices)
+        interest_rate = lr.coef_[0]
+        return interest_rate
+
     def _compute_covariances(self, data: pd.DataFrame):
+        """Computes the covariances based on a geometric Brownian motion model."""
         data = data.copy()
-        times = DataMunger.get_times_from_index(data)
+        normalized_data = data.divide(data.iloc[0], axis=1)
+        times = DataMunger.get_times_from_index(normalized_data)
         predicted_data = self.predict(times)
-        noise = data / predicted_data - 1.0
+        idx = times > 0
+        noise = np.log(normalized_data[idx] / predicted_data[idx]).divide(times[idx]**0.5, axis=0)
         try:
             covariances = GraphicalLassoCV().fit(noise).covariance_
             covariances = pd.DataFrame(covariances, index=noise.columns, columns=noise.columns)
@@ -176,9 +191,8 @@ class FinancialModel:
 
     @staticmethod
     def _check_portfolio(portfolio: pd.Series):
-        eps = 1.e-6
-        portfolio_doesnt_sum_to_one = not np.isclose(portfolio.sum(), 1.0, atol=eps)
-        negative_assets_exist = np.any(portfolio < -eps)  # assume no negative assets for now
+        portfolio_doesnt_sum_to_one = not np.isclose(portfolio.sum(), 1.0, atol=FinancialModel.EPS)
+        negative_assets_exist = np.any(portfolio < -FinancialModel.EPS)  # assume no negative assets for now
         if portfolio_doesnt_sum_to_one or negative_assets_exist:
             raise ValueError(f"Invalid portfolio found. "
                              f"Ensure that the portfolio contains only positive assets and that all values sum to one")
