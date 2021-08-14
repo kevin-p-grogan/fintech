@@ -1,5 +1,3 @@
-import math
-
 import pandas as pd
 
 from src.data_munger import DataMunger
@@ -17,8 +15,8 @@ RESULTS_BASE_DIR = "../data/results"
 NUM_DAYS_TIME_HORIZON = 365 / 2.0
 ANALYSIS_COLUMN = "Adj Close"
 INVESTMENT_AMOUNT = 1000.  # [$]
-PORTFOLIO_VOLATILITY = 0.02
-SPARSITY_IMPORTANCE = 0.2
+PORTFOLIO_VOLATILITY = 0.0185
+SPARSITY_IMPORTANCE = 0.5
 
 # Plotting
 price_limits = [0.6, 1.4]

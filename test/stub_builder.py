@@ -28,11 +28,13 @@ class StubBuilder:
 
     @staticmethod
     def create_test_data(params: List[DataParameters]) -> pd.DataFrame:
+        """Create data according to geometric Brownian motion model."""
         num_times = 10000
         times = np.linspace(0, 1, num_times)
         dates = StubBuilder.make_dates(times)
         data = pd.DataFrame({
-            p.name: np.exp(p.interest_rate * times + p.variance**0.5 * np.random.randn(num_times)) for p in params
+            p.name: np.exp(p.interest_rate * times + (p.variance*times)**0.5 * np.random.randn(num_times))
+            for p in params
         }, index=dates)
         return data
 
