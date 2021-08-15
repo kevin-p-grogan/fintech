@@ -90,8 +90,8 @@ class PortfolioOptimizer:
 
     @staticmethod
     def _entropy(probabilities: np.ndarray) -> float:
-        smoothed_probabilities = probabilities + PortfolioOptimizer.EPS
-        return float(np.sum(smoothed_probabilities * np.log(smoothed_probabilities)))
+        smoothed_probabilities = np.maximum(probabilities, PortfolioOptimizer.EPS)
+        return -float(np.sum(smoothed_probabilities * np.log(smoothed_probabilities)))
 
     def _objective_jacobian(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> np.ndarray:
         yearly_return_jacobian = self.financial_model.predict_yearly_return_jacobian()
@@ -103,8 +103,8 @@ class PortfolioOptimizer:
 
     @staticmethod
     def _entropy_jacobian(probabilities: np.ndarray) -> np.ndarray:
-        smoothed_probabilities = probabilities + PortfolioOptimizer.EPS
-        return 1.0 + np.log(smoothed_probabilities)
+        smoothed_probabilities = np.maximum(probabilities, PortfolioOptimizer.EPS)
+        return -1.0 - np.log(smoothed_probabilities)
 
     @property
     def optimal_weights(self) -> pd.DataFrame:
