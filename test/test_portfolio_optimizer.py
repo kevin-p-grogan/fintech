@@ -43,11 +43,10 @@ class TestPortfolioOptimizer(unittest.TestCase):
         self.assertTrue(np.isclose(finite_difference, predicted, rtol=1.e-3))
 
     def test_get_portfolio_weights(self):
-        variance = 0.01
-        params = [DataParameters("test1", 0.1, variance), DataParameters("test2", -0.3, 0.05)]
+        params = [DataParameters("test1", 0.1, 0.01), DataParameters("test2", 0.3, 0.05)]
         portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
         portfolio_optimizer.optimize()
-        portfolio_weights = portfolio_optimizer.get_portfolio_weights(variance)
+        portfolio_weights = portfolio_optimizer.get_portfolio_weights(0.015)
         self.assertIsInstance(portfolio_weights, pd.Series)
         self.assertGreater(portfolio_weights["test1"], portfolio_weights["test2"])
 
