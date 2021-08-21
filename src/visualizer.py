@@ -37,10 +37,14 @@ class Visualizer:
             optimizer: PortfolioOptimizer,
             data: pd.DataFrame,
             num_volatilities: int = 10,
-            price_limits: Optional[list[float]] = None):
+            price_limits: Optional[list[float]] = None,
+            exceedance_probability: float = 0.95,
+            num_day_in_future: float = 30.):
         data = data.copy()
         self._plot_portfolio_per_volatility(optimizer, data, num_volatilities, price_limits)
         self._plot_volatility_apr_tradeoff(optimizer, num_volatilities)
+        self._plot_exceedance_value_per_volatility(
+            optimizer, num_volatilities, exceedance_probability, num_day_in_future)
 
     def _plot_volatility_apr_tradeoff(self, optimizer: PortfolioOptimizer, num_volatilities: int = 10):
         volatilities = np.linspace(optimizer.min_volatility, optimizer.max_volatility, num_volatilities)
@@ -71,13 +75,36 @@ class Visualizer:
             plt.xlabel("Time in Fraction of a Year")
             plt.ylabel("Prices")
             apr = optimizer.compute_apr_from_volatility(volatility)
-            plt.title(f"Portfolio Volatility = {volatility:1.3f}. Portfolio APR = {apr:1.3f}.")
+            plt.title(f"Portfolio Volatility = {volatility:1.3f}. Portfolio Median APR = {apr:1.3f}.")
             plt.legend(loc="best")
             filename = f"portfolio_volatility_{volatility:1.3f}_apr_{apr:1.3f}.png"
             plt.ylim(price_limits) if price_limits else None
             path = os.path.join(self._folder, filename)
             plt.savefig(path)
             plt.clf()
+
+    def _plot_exceedance_value_per_volatility(
+            self,
+            optimizer: PortfolioOptimizer,
+            num_volatilities: int = 10,
+            exceedance_probability: float = 0.95,
+            num_days_in_future: float = 30.):
+        """Plots the exceedance value of a portfolio at an inputted probability for a given time horizon"""
+        time = DataMunger.convert_days_to_time(num_days_in_future)
+        volatilities = np.linspace(optimizer.min_volatility, optimizer.max_volatility, num_volatilities)
+        exceedance_values = [
+            optimizer.compute_exceedance_from_volatility(vol, time, exceedance_probability) for vol in volatilities
+        ]
+        plt.plot(volatilities, exceedance_values, 'ks-')
+        plt.xlabel("Volatility")
+        plt.ylabel("Exceedance Value")
+        plt.title(f"{exceedance_probability * 100}% Exceedance Probability, "
+                  f"{num_days_in_future} Days in the Future")
+        plt.legend(loc="best")
+        filename = f"exceedance_values.png"
+        path = os.path.join(self._folder, filename)
+        plt.savefig(path)
+        plt.clf()
 
     def make_portfolio_update_plot(self, portfolio_update: pd.Series, num_assets_plotted: int = 10):
         sorted_update = portfolio_update.sort_values(ascending=False)

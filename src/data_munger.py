@@ -49,9 +49,15 @@ class DataMunger:
         dates = data.index.to_series()
         start_date = dates.min()
         deltas = (date - start_date for date in dates)
-        days_in_year = 365.0
-        times = pd.Series([delta.days / days_in_year for delta in deltas], index=dates)
+        times = pd.Series([DataMunger.convert_days_to_time(delta.days) for delta in deltas], index=dates)
         return times
+
+    @staticmethod
+    def convert_days_to_time(days: float) -> float:
+        """Normalizes the days to a standard time"""
+        days_in_year = 365.0
+        return days / days_in_year
+
 
     @staticmethod
     def load_portfolio_data(file_path: str, index_col: str = "Symbol") -> pd.DataFrame:

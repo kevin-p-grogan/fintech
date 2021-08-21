@@ -191,3 +191,13 @@ class PortfolioOptimizer:
         portfolio_weights = self.get_portfolio_weights(risk)
         apr = self.financial_model.predict_apr(np.array(portfolio_weights))
         return apr
+
+    def compute_exceedance_from_volatility(
+            self,
+            volatility: float,
+            time: float,
+            exceedance_probability: float) -> float:
+        risk = self.financial_model.volatility_to_risk(volatility)
+        portfolio_weights = self.get_portfolio_weights(risk)
+        ev = self.financial_model.predict_exceedance_value(np.array(portfolio_weights), time, exceedance_probability)
+        return ev

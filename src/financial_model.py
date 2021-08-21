@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.covariance import GraphicalLassoCV
 import numpy as np
+from scipy.stats import lognorm
 
 from src.data_munger import DataMunger
 
@@ -18,7 +19,7 @@ class FinancialModel:
     EPS: float = 1.0e-6
 
     def predict_yearly_return(self, portfolio_weights: np.array) -> float:
-        """Computes the yearly return compounded continuously.
+        """Computes the yearly median return compounded continuously.
         Includes current portfolio weights if set during training."""
         interest_rates_array = np.array(self.interest_rates).reshape((-1, 1))
         weights_array = self.get_weights_array(portfolio_weights)
@@ -42,6 +43,22 @@ class FinancialModel:
         yearly_return = self.predict_yearly_return(portfolio_weights)
         apr = np.exp(yearly_return) - 1.0
         return apr
+
+    def predict_exceedance_value(
+            self,
+            portfolio_weights: np.array,
+            time: float,
+            exceedance_probability: float) -> float:
+        """Computes the exceedance value using a lognormal model."""
+        yearly_return = self.predict_yearly_return(portfolio_weights)
+        risk = self.predict_risk(portfolio_weights)
+        std_dev = np.sqrt(risk * time)
+        exp_return = np.exp(yearly_return * time)
+        loss_probability = 1.0 - exceedance_probability
+        exceedance_ratio = lognorm.ppf(loss_probability, s=std_dev, scale=exp_return)
+        exceedance_value = exceedance_ratio - 1.0
+        return exceedance_value
+
 
     def predict_yearly_return_jacobian(self) -> np.ndarray:
         return np.array(self.interest_rates) / self.weights_scale

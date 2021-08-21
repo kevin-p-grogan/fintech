@@ -19,7 +19,9 @@ PORTFOLIO_VOLATILITY = 0.07
 SPARSITY_IMPORTANCE = 0.001
 
 # Plotting
-price_limits = [0.6, 1.4]
+PRICE_LIMITS = [0.6, 1.4]
+NUM_DAYS_IN_FUTURE = 365 / 12
+EXCEEDANCE_PROBILITY = 0.95
 
 
 def main():
@@ -35,7 +37,13 @@ def main():
     visualizer.make_financial_model_plots(financial_model, data)
     portfolio_optimizer = PortfolioOptimizer(financial_model, sparsity_importance=SPARSITY_IMPORTANCE)
     portfolio_optimizer.optimize()
-    visualizer.make_portfolio_optimizer_plots(portfolio_optimizer, data, price_limits=price_limits)
+    visualizer.make_portfolio_optimizer_plots(
+        portfolio_optimizer,
+        data,
+        price_limits=PRICE_LIMITS,
+        num_day_in_future=NUM_DAYS_IN_FUTURE,
+        exceedance_probability=EXCEEDANCE_PROBILITY
+    )
     portfolio_update = portfolio_optimizer.get_portfolio_update(PORTFOLIO_VOLATILITY)
     visualizer.make_portfolio_update_plot(portfolio_update)
     portfolio_optimizer.save_portfolio_update(paths.data.portfolio_weights, portfolio_update, METADATA_FILE_PATH)

@@ -69,7 +69,6 @@ class TestFinancialModel(unittest.TestCase):
         portfolio_weights = np.array([1.0, 0])
         risk = financial_model.predict_risk(portfolio_weights)
         self.assertTrue(np.isclose(risk, variance1, rtol=0.1))
-
         # Unbalanced2
         portfolio_weights = np.array([0., 1.])
         risk = financial_model.predict_risk(portfolio_weights)
@@ -98,6 +97,29 @@ class TestFinancialModel(unittest.TestCase):
         self.assertIsInstance(current_portfolio_weights, np.ndarray)
         self.assertGreater(current_portfolio_weights.sum(), 1.0)
         self.assertEqual(len(current_portfolio_weights), len(financial_model._interest_rates))
+
+    def test_predict_exceedance_value(self):
+        interest_rate = 0.1
+        variance = 0.01
+        params = [DataParameters("test", interest_rate, variance)]
+        financial_model = StubBuilder.create_financial_model(params)
+        portfolio_weights = np.array([1.0])
+
+        # 100% probability that you do not lose everything
+        ev = financial_model.predict_exceedance_value(portfolio_weights, time=1, exceedance_probability=1)
+        self.assertEqual(ev, -1.0)
+
+        # 0% probability that you do not make an infinite amount
+        ev = financial_model.predict_exceedance_value(portfolio_weights, time=1, exceedance_probability=0)
+        self.assertTrue(np.isinf(ev))
+
+        # The exceedance value should be less than the interest rate for a high exceedance probability
+        ev = financial_model.predict_exceedance_value(portfolio_weights, time=1, exceedance_probability=0.95)
+        self.assertGreater(interest_rate, ev)
+
+        # Exceedance value should be close to interest rate at 50% probaility
+        ev = financial_model.predict_exceedance_value(portfolio_weights, time=1, exceedance_probability=0.5)
+        self.assertTrue(np.isclose(interest_rate, ev, atol=0.01))
 
 
 if __name__ == '__main__':
