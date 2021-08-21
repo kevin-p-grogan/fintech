@@ -100,7 +100,6 @@ class Visualizer:
         plt.ylabel("Exceedance Value")
         plt.title(f"{exceedance_probability * 100}% Exceedance Probability, "
                   f"{num_days_in_future} Days in the Future")
-        plt.legend(loc="best")
         filename = f"exceedance_values.png"
         path = os.path.join(self._folder, filename)
         plt.savefig(path)

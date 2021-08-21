@@ -21,7 +21,7 @@ SPARSITY_IMPORTANCE = 0.001
 # Plotting
 PRICE_LIMITS = [0.6, 1.4]
 NUM_DAYS_IN_FUTURE = 365 / 12
-EXCEEDANCE_PROBILITY = 0.95
+EXCEEDANCE_PROBABILITY = 0.95
 
 
 def main():
@@ -42,7 +42,7 @@ def main():
         data,
         price_limits=PRICE_LIMITS,
         num_day_in_future=NUM_DAYS_IN_FUTURE,
-        exceedance_probability=EXCEEDANCE_PROBILITY
+        exceedance_probability=EXCEEDANCE_PROBABILITY
     )
     portfolio_update = portfolio_optimizer.get_portfolio_update(PORTFOLIO_VOLATILITY)
     visualizer.make_portfolio_update_plot(portfolio_update)
