@@ -59,7 +59,6 @@ class FinancialModel:
         exceedance_value = exceedance_ratio - 1.0
         return exceedance_value
 
-
     def predict_yearly_return_jacobian(self) -> np.ndarray:
         return np.array(self.interest_rates) / self.weights_scale
 
