@@ -132,7 +132,7 @@ class FinancialModel:
         interest_rate = lr.coef_[0]
         return interest_rate
 
-    def _compute_covariances(self, data: pd.DataFrame):
+    def _compute_covariances(self, data: pd.DataFrame, use_graphical_lasso=False):
         """Computes the covariances based on a geometric Brownian motion model."""
         data = data.copy()
         normalized_data = data.divide(data.iloc[0], axis=1)
@@ -140,15 +140,14 @@ class FinancialModel:
         predicted_data = self.predict(times)
         idx = times > 0
         noise = np.log(normalized_data[idx] / predicted_data[idx]).divide(times[idx]**0.5, axis=0)
-        try:
+        if use_graphical_lasso:
             covariances = GraphicalLassoCV().fit(noise).covariance_
             covariances = pd.DataFrame(covariances, index=noise.columns, columns=noise.columns)
-        except Exception as e:
-            print(f"WARNING: Graphical Lasso failed with exception '{e}'. Resorting to sample covariance.")
+        else:
             covariances = noise.cov()
 
         self._covariances = covariances
-        self._minimum_risk = np.min(np.linalg.eigvals(self._covariances))
+        self._minimum_risk = max(np.min(np.linalg.eigvals(self._covariances)), 0.0)
 
     def _compute_current_portfolio_weights(self, portfolio_data: pd.DataFrame, investment_amount: float) -> np.ndarray:
         symbols = self._get_current_portfolio_symbols(portfolio_data)
