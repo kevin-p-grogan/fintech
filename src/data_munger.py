@@ -61,7 +61,7 @@ class DataMunger:
 
     @staticmethod
     def load_portfolio_data(file_path: str, index_col: str = "Symbol") -> pd.DataFrame:
-        raw_sequence = pd.read_csv(file_path, header=None, comment="#")
+        raw_sequence = pd.read_csv(file_path, header=None, comment="#", delimiter="\n")
         raw_sequence = np.squeeze(raw_sequence.to_numpy())
         header = raw_sequence[:DataMunger.NUM_PORTFOLIO_DATA_COLS]
         data = raw_sequence[DataMunger.NUM_PORTFOLIO_DATA_COLS:]
