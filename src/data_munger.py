@@ -27,7 +27,8 @@ class DataMunger:
             if subcolumn == self._analysis_column:
                 daily_prices[symbol] = data[symbol][subcolumn]
 
-        scaled_prices = daily_prices / daily_prices.iloc[0]
+        interpolated_prices = daily_prices.interpolate(limit=None, limit_direction="both")
+        scaled_prices = interpolated_prices / interpolated_prices.iloc[0]
         return scaled_prices
 
     def _get_start_date(self, dates: pd.Index) -> datetime:
