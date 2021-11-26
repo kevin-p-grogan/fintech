@@ -144,4 +144,5 @@ cython_debug/
 # data files
 data/results/*
 portfolio.txt
+metadata.csv
 data.pkl
