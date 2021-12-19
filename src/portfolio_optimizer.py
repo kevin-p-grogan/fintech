@@ -1,5 +1,6 @@
 from typing import Optional
 import os
+from warnings import warn
 
 from scipy.optimize import minimize, LinearConstraint
 from scipy.interpolate import interp1d
@@ -157,20 +158,25 @@ class PortfolioOptimizer:
         return path
 
     def get_portfolio_weights(self, risk: float) -> pd.Series:
-        self._check_risk(risk)
+        risk = self._check_risk(risk)
         interpolated_weights = self.risk_interpolator(risk)
         weights_array = self.financial_model.get_weights_array(interpolated_weights)
         weights_array = np.squeeze(weights_array)
         portfolio_weights = pd.Series(weights_array, index=self.financial_model.asset_names)
         return portfolio_weights
 
-    def _check_risk(self, risk: float):
+    def _check_risk(self, unchecked_risk: float) -> float:
         min_risk = self.optimal_results["Risk"].min()
         max_risk = self.optimal_results["Risk"].max()
-        in_bounds = min_risk <= risk <= max_risk
+        in_bounds = min_risk <= unchecked_risk <= max_risk
+        risk = unchecked_risk
         if not in_bounds:
-            raise ValueError(f"Inputted risk, {risk}, is not in bounds. "
-                             f"It must be between {min_risk} and {max_risk}.")
+            risk = (max_risk + min_risk) / 2.0
+            warn(f"Inputted risk, {unchecked_risk}, is not in bounds. "
+                 f"It must be between {min_risk} and {max_risk}. "
+                 f"Using middle value of {risk} (volatility={self.financial_model.risk_to_volatility(risk)}.")
+
+        return risk
 
     @property
     def min_volatility(self) -> float:
