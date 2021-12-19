@@ -109,8 +109,8 @@ class Visualizer:
         sorted_update = portfolio_update.sort_values(ascending=False)
         filtered_update = sorted_update.iloc[:num_assets_plotted]
         filtered_update["Other"] = sorted_update.iloc[num_assets_plotted:].sum()
-        plt.bar(filtered_update.index, filtered_update, color='maroon',
-                width=0.4)
+        plt.figure(figsize=(12, 4))
+        plt.bar(filtered_update.index, filtered_update, color='maroon', width=0.4)
         plt.xlabel("Symbol")
         plt.ylabel("Percentages")
         plt.title("Portfolio Update Weights")
