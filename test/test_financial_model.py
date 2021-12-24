@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from stub_builder import StubBuilder, DataParameters
-from src.data_munger import DataMunger
+from src.data import Munger
 
 
 class TestFinancialModel(unittest.TestCase):
@@ -91,8 +91,8 @@ class TestFinancialModel(unittest.TestCase):
             DataParameters("TEST3", 0.2, 2.e-3)
         ]
         financial_model = StubBuilder.create_financial_model(params)
-        data_munger = DataMunger()
-        portfolio_data = data_munger.load_portfolio_data(self._portfolio_data_filepath)
+        munger = Munger()
+        portfolio_data = munger.load_portfolio_data(self._portfolio_data_filepath)
         current_portfolio_weights = financial_model._compute_current_portfolio_weights(portfolio_data, 10.0)
         self.assertIsInstance(current_portfolio_weights, np.ndarray)
         self.assertGreater(current_portfolio_weights.sum(), 1.0)

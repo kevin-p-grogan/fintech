@@ -3,22 +3,22 @@ import unittest
 import pandas as pd
 import numpy as np
 
-from src.data_munger import DataMunger
+from src.data import Munger
 
 
-class TestDataMunger(unittest.TestCase):
+class TestMunger(unittest.TestCase):
     _data_filepath = "resources/test_data.pkl"
     _portfolio_data_filepath = "resources/test_portfolio.txt"
 
     def test_preprocess(self):
         data = pd.read_pickle(self._data_filepath)
-        data_munger = DataMunger()
-        preprocessed_data = data_munger.preprocess(data)
+        munger = Munger()
+        preprocessed_data = munger.preprocess(data)
         self.assertIsInstance(preprocessed_data, pd.DataFrame)
 
     def test_load_portfolio_data(self):
-        data_munger = DataMunger()
-        portfolio_data = data_munger.load_portfolio_data(self._portfolio_data_filepath)
+        munger = Munger()
+        portfolio_data = munger.load_portfolio_data(self._portfolio_data_filepath)
         self.assertIsInstance(portfolio_data, pd.DataFrame)
         num_test_assets = 2
         self.assertEqual(len(portfolio_data), num_test_assets)

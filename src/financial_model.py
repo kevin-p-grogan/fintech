@@ -6,7 +6,7 @@ from sklearn.covariance import GraphicalLassoCV
 import numpy as np
 from scipy.stats import lognorm
 
-from src.data_munger import DataMunger
+from src.data import Munger
 
 
 class FinancialModel:
@@ -106,7 +106,7 @@ class FinancialModel:
             raise ValueError("Portfolio data and investment amount must be defined to incorporate current portfolio.")
 
     def _compute_interest_rates(self, data: pd.DataFrame):
-        times = DataMunger.get_times_from_index(data)
+        times = Munger.get_times_from_index(data)
         interest_rates = []
         symbols = []
         for symbol in data:
@@ -136,7 +136,7 @@ class FinancialModel:
         """Computes the covariances based on a geometric Brownian motion model."""
         data = data.copy()
         normalized_data = data.divide(data.iloc[0], axis=1)
-        times = DataMunger.get_times_from_index(normalized_data)
+        times = Munger.get_times_from_index(normalized_data)
         predicted_data = self.predict(times)
         idx = times > 0
         noise = np.log(normalized_data[idx] / predicted_data[idx]).divide(times[idx]**0.5, axis=0)

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.data_munger import DataMunger
+from src.data import Munger
 from src.financial_model import FinancialModel
 from src.portfolio_optimizer import PortfolioOptimizer
 from src.results_paths import ResultsPaths
@@ -10,9 +10,9 @@ from src.config import Config
 
 def main(cfg: Config):
     data = pd.read_pickle(cfg.DATA_FILEPATH)
-    data_munger = DataMunger(num_days_time_horizon=cfg.NUM_DAYS_TIME_HORIZON, anaysis_column=cfg.ANALYSIS_COLUMN)
-    data = data_munger.preprocess(data)
-    portfolio_data = data_munger.load_portfolio_data(cfg.PORTFOLIO_DATA_FILEPATH)
+    munger = Munger(num_days_time_horizon=cfg.NUM_DAYS_TIME_HORIZON, anaysis_column=cfg.ANALYSIS_COLUMN)
+    data = munger.preprocess(data)
+    portfolio_data = munger.load_portfolio_data(cfg.PORTFOLIO_DATA_FILEPATH)
     paths = ResultsPaths(cfg.RESULTS_BASE_DIR)
     portfolio_data.to_csv(paths.data.current_portfolio)
     financial_model = FinancialModel()

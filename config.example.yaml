@@ -1,7 +1,6 @@
 fetch_data: # parameters for fetch_data.py
   METADATA_FILEPATH: "../data/raw/metadata.csv"
   OUTPUT_FILEPATH: "../data/raw/data.pkl"
-  TICKER_SYMBOL_COLUMN: "Symbol"
   PERIOD: "5y"  # Grab data for the last 5 years
   INTERVAL: "1d"  # Grab daily data
 

@@ -7,7 +7,7 @@ import numpy as np
 
 from src.financial_model import FinancialModel
 from src.portfolio_optimizer import PortfolioOptimizer
-from src.data_munger import DataMunger
+from src.data import Munger
 
 
 class Visualizer:
@@ -18,7 +18,7 @@ class Visualizer:
 
     def make_financial_model_plots(self, model: FinancialModel, data: pd.DataFrame):
         data = data.copy()
-        times = DataMunger.get_times_from_index(data)
+        times = Munger.get_times_from_index(data)
         predicted_data = model.predict(times)
         for symbol in data:
             plt.plot(times, data[symbol], 'ks', label="Actual")
@@ -64,7 +64,7 @@ class Visualizer:
             data: pd.DataFrame,
             num_volatilities: int = 10,
             price_limits: Optional[list[float]] = None):
-        times = DataMunger.get_times_from_index(data)
+        times = Munger.get_times_from_index(data)
         volatilities = np.linspace(optimizer.min_volatility, optimizer.max_volatility, num_volatilities)
         for i, volatility in enumerate(volatilities):
             risk = optimizer.financial_model.volatility_to_risk(volatility)
@@ -90,7 +90,7 @@ class Visualizer:
             exceedance_probability: float = 0.95,
             num_days_in_future: float = 30.):
         """Plots the exceedance value of a portfolio at an inputted probability for a given time horizon"""
-        time = DataMunger.convert_days_to_time(num_days_in_future)
+        time = Munger.convert_days_to_time(num_days_in_future)
         volatilities = np.linspace(optimizer.min_volatility, optimizer.max_volatility, num_volatilities)
         exceedance_values = [
             optimizer.compute_exceedance_from_volatility(vol, time, exceedance_probability) for vol in volatilities

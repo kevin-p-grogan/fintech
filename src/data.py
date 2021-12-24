@@ -4,11 +4,12 @@ import locale
 
 import numpy as np
 import pandas as pd
+import yfinance as yf
 
 locale.setlocale(locale.LC_ALL, 'en_us')
 
 
-class DataMunger:
+class Munger:
     _num_days_time_horizon: float
     _analysis_column: str
 
@@ -50,7 +51,7 @@ class DataMunger:
         dates = data.index.to_series()
         start_date = dates.min()
         deltas = (date - start_date for date in dates)
-        times = pd.Series([DataMunger.convert_days_to_time(delta.days) for delta in deltas], index=dates)
+        times = pd.Series([Munger.convert_days_to_time(delta.days) for delta in deltas], index=dates)
         return times
 
     @staticmethod
@@ -59,18 +60,17 @@ class DataMunger:
         days_in_year = 365.0
         return days / days_in_year
 
-
     @staticmethod
     def load_portfolio_data(file_path: str, index_col: str = "Symbol") -> pd.DataFrame:
         raw_sequence = pd.read_csv(file_path, header=None, comment="#", delimiter="\n")
         raw_sequence = np.squeeze(raw_sequence.to_numpy())
-        header = raw_sequence[:DataMunger.NUM_PORTFOLIO_DATA_COLS]
-        data = raw_sequence[DataMunger.NUM_PORTFOLIO_DATA_COLS:]
-        DataMunger._check_data_format(data, header)
-        data = data.reshape((-1, DataMunger.NUM_PORTFOLIO_DATA_COLS))
+        header = raw_sequence[:Munger.NUM_PORTFOLIO_DATA_COLS]
+        data = raw_sequence[Munger.NUM_PORTFOLIO_DATA_COLS:]
+        Munger._check_data_format(data, header)
+        data = data.reshape((-1, Munger.NUM_PORTFOLIO_DATA_COLS))
         df = pd.DataFrame(data, columns=header)
         df = df.set_index(index_col)
-        df = df.applymap(DataMunger._convert_numerics)
+        df = df.applymap(Munger._convert_numerics)
         return df
 
     @staticmethod
@@ -92,3 +92,22 @@ class DataMunger:
 
         return datum
 
+
+class Fetcher:
+    _metadata: pd.DataFrame
+
+    TICKER_SYMBOL_COLUMN = "Symbol"
+
+    def __init__(self, metadata_filepath: str):
+        self._metadata = pd.read_csv(metadata_filepath, comment="#")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb): ...
+
+    def fetch(self, period: str = '5y', interval: str = '1d') -> pd.DataFrame:
+        ticker_symbols = " ".join(self._metadata[self.TICKER_SYMBOL_COLUMN])
+        print("Fetching financial data ...")
+        data = yf.download(tickers=ticker_symbols, period=period, interval=interval, group_by="ticker")
+        return data
