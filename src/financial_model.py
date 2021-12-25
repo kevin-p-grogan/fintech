@@ -149,11 +149,13 @@ class FinancialModel:
         self._covariances = covariances
         self._minimum_risk = max(np.min(np.linalg.eigvals(self._covariances)), 0.0)
 
-    def _compute_current_portfolio_weights(self, portfolio_data: pd.DataFrame, investment_amount: float) -> np.ndarray:
+    def _compute_current_portfolio_weights(
+            self, portfolio_data: pd.DataFrame, investment_amount: float = 1.0) -> np.ndarray:
+        """Computes the weights of the current portfolio normalized to the investment amount."""
         symbols = self._get_current_portfolio_symbols(portfolio_data)
         values = portfolio_data.loc[symbols, self.PORTFOLIO_VALUE_COLUMN]
         values /= investment_amount
-        current_portfolio_weights = pd.Series(np.zeros_like(self.asset_names, dtype=np.float), index=self.asset_names)
+        current_portfolio_weights = pd.Series(np.zeros_like(self.asset_names, dtype=float), index=self.asset_names)
         current_portfolio_weights[symbols] = values
         return current_portfolio_weights.to_numpy()
 

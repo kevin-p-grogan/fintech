@@ -7,7 +7,7 @@ from src.data import Munger
 
 
 class TestFinancialModel(unittest.TestCase):
-    _portfolio_data_filepath = "resources/test_portfolio.txt"
+    _portfolio_data_filepath = "resources/test_portfolio.pkl"
 
     EPS: float = 1.e-6
 
@@ -86,16 +86,13 @@ class TestFinancialModel(unittest.TestCase):
         self.assertTrue(np.isclose(finite_difference_jacobian, predicted_jacobian, rtol=1.e-3))
 
     def test_compute_current_portfolio_weights(self):
-        params = [
-            DataParameters("TEST1", 0.1, 1.e-3),
-            DataParameters("TEST3", 0.2, 2.e-3)
-        ]
+        portfolio_data = Munger().load_portfolio_data(self._portfolio_data_filepath)
+        params = [DataParameters(symbol, 0.1, 1e-3) for symbol in portfolio_data.index]
         financial_model = StubBuilder.create_financial_model(params)
-        munger = Munger()
-        portfolio_data = munger.load_portfolio_data(self._portfolio_data_filepath)
-        current_portfolio_weights = financial_model._compute_current_portfolio_weights(portfolio_data, 10.0)
+        total_equity = portfolio_data["Equity"].sum()
+        current_portfolio_weights = financial_model._compute_current_portfolio_weights(portfolio_data)
         self.assertIsInstance(current_portfolio_weights, np.ndarray)
-        self.assertGreater(current_portfolio_weights.sum(), 1.0)
+        self.assertEqual(current_portfolio_weights.sum(), total_equity)
         self.assertEqual(len(current_portfolio_weights), len(financial_model._interest_rates))
 
     def test_predict_exceedance_value(self):

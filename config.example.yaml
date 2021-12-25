@@ -1,13 +1,14 @@
 fetch_data: # parameters for fetch_data.py
   METADATA_FILEPATH: "../data/raw/metadata.csv"
-  OUTPUT_FILEPATH: "../data/raw/data.pkl"
+  FINANCIAL_DATA_FILEPATH: "../data/raw/data.pkl"
+  PORTFOLIO_DATA_FILEPATH: "../data/raw/portfolio.pkl"
   PERIOD: "5y"  # Grab data for the last 5 years
   INTERVAL: "1d"  # Grab daily data
 
 create_portfolio: # configuration for create_portfolio.py
   DATA_FILEPATH: "../data/raw/data.pkl"
-  PORTFOLIO_DATA_FILEPATH: "../data/raw/portfolio.txt"
-  METADATA_FILE_PATH: "../data/raw/metadata.csv"
+  PORTFOLIO_DATA_FILEPATH: "../data/raw/portfolio.pkl"
+  METADATA_FILEPATH: "../data/raw/metadata.csv"
   RESULTS_BASE_DIR: "../data/results"
 
   # Parameters

@@ -1,19 +1,83 @@
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 import locale
+import pickle as pkl
+from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from robin_stocks import robinhood as r
+from dotenv import dotenv_values
+from pydantic import BaseModel
 
 locale.setlocale(locale.LC_ALL, 'en_us')
+
+
+class PortfolioRecord(BaseModel):
+    """Pydantic class to handle the validation and transformation."""
+
+    symbol: str
+    name: str
+    shares: float
+    price: float
+    average_cost: float
+    last_transaction: datetime
+
+    @property
+    def total_return(self) -> float:
+        return (self.price - self.average_cost) * self.shares
+
+    @property
+    def equity(self) -> float:
+        return self.price * self.shares
+
+    @staticmethod
+    def make_from_stock(stock: dict) -> 'PortfolioRecord':
+        return PortfolioRecord(
+            symbol=stock["symbol"],
+            name=stock["name"],
+            shares=stock['quantity'],
+            price=stock['price'],
+            average_cost=stock['average_buy_price'],
+            last_transaction=stock['updated_at']
+        )
+
+    @staticmethod
+    def make_from_crypto(crypto: dict) -> 'PortfolioRecord':
+        assert len(crypto["cost_bases"]) == 1  # Assume only one cost basis to pull average cost
+        cost_basis = crypto['cost_bases'][0]
+        average_cost = float(cost_basis["direct_cost_basis"]) / float(crypto['quantity'])
+        return PortfolioRecord(
+            symbol=crypto["currency"]["code"] + "-USD",
+            name=crypto["currency"]["name"],
+            shares=crypto['quantity'],
+            price=crypto['price'],
+            average_cost=average_cost,
+            last_transaction=crypto['updated_at']
+        )
+
+    @staticmethod
+    def convert_records_to_dataframe(records: list['PortfolioRecord']) -> pd.DataFrame:
+        attribute_to_column = OrderedDict({
+            "symbol": "Symbol",
+            "name": "Name",
+            "shares": "Shares",
+            "price": "Price",
+            "average_cost": "Average Cost",
+            "total_return": "Total Return",
+            "equity": "Equity",
+            "last_transaction": "Last Transaction"
+        })
+        data = [tuple(getattr(record, attr) for attr in attribute_to_column.keys()) for record in records]
+        df = pd.DataFrame.from_records(data, columns=list(attribute_to_column.values()))
+        df = df.set_index("Symbol")
+        return df
 
 
 class Munger:
     _num_days_time_horizon: float
     _analysis_column: str
-
-    NUM_PORTFOLIO_DATA_COLS = 7
 
     def __init__(self, num_days_time_horizon: float = 365., anaysis_column: str = "Adj Close"):
         self._num_days_time_horizon = num_days_time_horizon
@@ -61,16 +125,13 @@ class Munger:
         return days / days_in_year
 
     @staticmethod
-    def load_portfolio_data(file_path: str, index_col: str = "Symbol") -> pd.DataFrame:
-        raw_sequence = pd.read_csv(file_path, header=None, comment="#", delimiter="\n")
-        raw_sequence = np.squeeze(raw_sequence.to_numpy())
-        header = raw_sequence[:Munger.NUM_PORTFOLIO_DATA_COLS]
-        data = raw_sequence[Munger.NUM_PORTFOLIO_DATA_COLS:]
-        Munger._check_data_format(data, header)
-        data = data.reshape((-1, Munger.NUM_PORTFOLIO_DATA_COLS))
-        df = pd.DataFrame(data, columns=header)
-        df = df.set_index(index_col)
-        df = df.applymap(Munger._convert_numerics)
+    def load_portfolio_data(file_path: str) -> pd.DataFrame:
+        with open(file_path, "rb") as f:
+            portfolio_data = pkl.load(f)
+
+        records = [PortfolioRecord.make_from_stock(stock) for stock in portfolio_data["stocks"]]
+        records += [PortfolioRecord.make_from_crypto(crypto) for crypto in portfolio_data["cryptos"]]
+        df = PortfolioRecord.convert_records_to_dataframe(records)
         return df
 
     @staticmethod
@@ -95,19 +156,60 @@ class Munger:
 
 class Fetcher:
     _metadata: pd.DataFrame
+    _login_data: Optional[dict] = None
 
     TICKER_SYMBOL_COLUMN = "Symbol"
+    ENV_FILE = "../.env"
 
     def __init__(self, metadata_filepath: str):
         self._metadata = pd.read_csv(metadata_filepath, comment="#")
 
-    def __enter__(self):
+    def __enter__(self) -> 'Fetcher':
+        self.login()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb): ...
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.logout()
 
-    def fetch(self, period: str = '5y', interval: str = '1d') -> pd.DataFrame:
+    def login(self) -> None:
+        login_info = dotenv_values(self.ENV_FILE)
+        self._login_data = r.login(username=login_info["USERNAME"], password=login_info["PASSWORD"])
+
+    def logout(self) -> None:
+        r.logout()
+        self._login_data = None
+
+    def fetch_financial_data(self, period: str = '5y', interval: str = '1d') -> pd.DataFrame:
         ticker_symbols = " ".join(self._metadata[self.TICKER_SYMBOL_COLUMN])
-        print("Fetching financial data ...")
         data = yf.download(tickers=ticker_symbols, period=period, interval=interval, group_by="ticker")
         return data
+
+    @staticmethod
+    def fetch_portfolio_data() -> dict:
+        portfolio_data = {
+            "stocks": Fetcher._fetch_stocks(),
+            "cryptos": Fetcher._fetch_cryptos()
+        }
+        return portfolio_data
+
+    @staticmethod
+    def _fetch_stocks() -> list[dict]:
+        stocks = r.get_open_stock_positions()
+        for stock in stocks:
+            stock["symbol"] = r.get_symbol_by_url(stock["instrument"])
+            stock["name"] = r.get_name_by_url(stock["instrument"])
+
+        prices = r.get_latest_price([s["symbol"] for s in stocks])
+        for stock, price in zip(stocks, prices):
+            stock["price"] = price
+
+        return stocks
+
+    @staticmethod
+    def _fetch_cryptos() -> list[dict]:
+        cryptos = r.get_crypto_positions()
+        for crypto in cryptos:
+            quote = r.crypto.get_crypto_quote(crypto["currency"]["code"])
+            crypto["price"] = quote["mark_price"]
+
+        return cryptos
