@@ -106,11 +106,12 @@ class Visualizer:
         plt.clf()
 
     def make_portfolio_update_plot(self, portfolio_update: pd.Series, num_assets_plotted: int = 10):
-        sorted_update = portfolio_update.sort_values(ascending=False)
+        sorted_update = portfolio_update.sort_values(ascending=False, key=abs)
         filtered_update = sorted_update.iloc[:num_assets_plotted]
         filtered_update["Other"] = sorted_update.iloc[num_assets_plotted:].sum()
         plt.figure(figsize=(12, 4))
-        plt.bar(filtered_update.index, filtered_update, color='maroon', width=0.4)
+        colors = ['black' if update > 0 else 'red' for update in filtered_update]
+        plt.bar(filtered_update.index, filtered_update, color=colors, width=0.4)
         plt.xlabel("Symbol")
         plt.ylabel("Percentages")
         plt.title("Portfolio Update Weights")

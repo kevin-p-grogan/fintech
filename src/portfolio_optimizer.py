@@ -20,6 +20,7 @@ class PortfolioOptimizer:
     LOWER_TRADEOFF_BOUND: float = 0.0
     UPPER_TRADEOFF_BOUND: float = 1.0
     EPS: float = 1.0e-6
+    SEED: int = 1337
 
     def __init__(self, model: FinancialModel, sparsity_importance: float = 0.1):
         self.financial_model = model
@@ -27,11 +28,13 @@ class PortfolioOptimizer:
         self._optimal_weights = None
         self._optimal_results = None
         self._risk_interpolator = None
+        np.random.seed(self.SEED)
 
     def optimize(self, num_evaluations: int = 11, verbose: bool = True):
         num_weights = self.financial_model.num_assets
-        initial_weights = np.ones((num_weights, 1)) / num_weights
-        constraints = [self._portfolio_weights_sum_to_one, self._portfolio_weights_non_negative]
+        initial_weights = np.random.random(num_weights)
+        initial_weights /= initial_weights.sum()
+        constraints = [self._portfolio_weights_sum_to_one, self._no_shorting]
         tradeoff_params = np.linspace(self.LOWER_TRADEOFF_BOUND, self.UPPER_TRADEOFF_BOUND, num_evaluations)
         optimal_weights = []
         optimal_results = []
@@ -66,18 +69,18 @@ class PortfolioOptimizer:
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 
     @property
-    def _portfolio_weights_non_negative(self) -> LinearConstraint:
-        num_weights = self.financial_model.num_assets
-        lower_bound = 0.0
+    def _no_shorting(self) -> LinearConstraint:
+        """Disables shorting of assets but allows selling of current assets."""
+        lower_bound = -self.financial_model.current_portfolio_weights
         upper_bound = np.inf
-        constraint_matrix = np.identity(num_weights)
+        constraint_matrix = np.identity(self.financial_model.num_assets)
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 
     def _objective(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> float:
         yearly_return = self.financial_model.predict_yearly_return(portfolio_weights)
         risk = self.financial_model.predict_risk(portfolio_weights)
         obj = -tradeoff_parameter * yearly_return + (
-                    1. - tradeoff_parameter) * risk + self.sparsity_weight * self._entropy(portfolio_weights)
+                    1. - tradeoff_parameter) * risk + self.sparsity_weight * self._notch(portfolio_weights)
         return obj
 
     @property
@@ -86,26 +89,37 @@ class PortfolioOptimizer:
         max_objective = max(self.financial_model.maximum_yearly_return, self.financial_model.minimum_risk)
         min_objective = min(self.financial_model.maximum_yearly_return, self.financial_model.minimum_risk)
         objective_scale = max_objective - min_objective
-        entropy_scale = np.log(self.financial_model.num_assets)
-        return self._sparsity_importance * objective_scale / entropy_scale
+        max_notch = 1.0
+        min_notch = 1.0 / self.financial_model.num_assets
+        notch_scale = max_notch - min_notch
+        return self._sparsity_importance * objective_scale / notch_scale
 
     @staticmethod
-    def _entropy(probabilities: np.ndarray) -> float:
-        smoothed_probabilities = np.maximum(probabilities, PortfolioOptimizer.EPS)
-        return -float(np.sum(smoothed_probabilities * np.log(smoothed_probabilities)))
+    def _notch(weights: np.ndarray) -> float:
+        """Creates a non-convex notch loss about zero. Seeks to increase sparsity with the sum-to-one constraint."""
+        num_weights = len(weights)
+        hinge_point = 1.0 / num_weights
+        notch = np.abs(weights)
+        notch[notch > hinge_point] = hinge_point
+        notch_loss = float(notch.sum())
+        return notch_loss
 
     def _objective_jacobian(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> np.ndarray:
         yearly_return_jacobian = self.financial_model.predict_yearly_return_jacobian()
         risk_jacobian = self.financial_model.predict_risk_jacobian(portfolio_weights)
         obj = -tradeoff_parameter * yearly_return_jacobian + (
-                    1. - tradeoff_parameter) * risk_jacobian + self.sparsity_weight * self._entropy_jacobian(
+                    1. - tradeoff_parameter) * risk_jacobian + self.sparsity_weight * self._notch_jacobian(
             portfolio_weights)
         return obj
 
     @staticmethod
-    def _entropy_jacobian(probabilities: np.ndarray) -> np.ndarray:
-        smoothed_probabilities = np.maximum(probabilities, PortfolioOptimizer.EPS)
-        return -1.0 - np.log(smoothed_probabilities)
+    def _notch_jacobian(weights: np.ndarray) -> np.ndarray:
+        num_weights = len(weights)
+        hinge_point = 1.0 / num_weights
+        notch_jacobian = np.zeros_like(weights)
+        idx = np.abs(weights) <= hinge_point
+        notch_jacobian[idx] = np.sign(weights[idx])
+        return notch_jacobian
 
     @property
     def optimal_weights(self) -> pd.DataFrame:
