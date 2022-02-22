@@ -10,6 +10,8 @@ from src.data import Munger
 
 
 class FinancialModel:
+    tax_rate: float
+
     _interest_rates: Optional[pd.Series] = None
     _covariances: Optional[pd.DataFrame] = None
     _current_portfolio_weights: Optional[np.ndarray] = None
@@ -18,18 +20,22 @@ class FinancialModel:
     PORTFOLIO_VALUE_COLUMN: str = "Equity"
     EPS: float = 1.0e-6
 
+    def __init__(self, tax_rate: float = 0.0):
+        self.tax_rate = tax_rate
+
     def predict_yearly_return(self, portfolio_weights: np.array) -> float:
         """Computes the yearly median return compounded continuously.
-        Includes current portfolio weights if set during training."""
-        interest_rates_array = np.array(self.interest_rates).reshape((-1, 1))
+        Includes current portfolio weights if set during training.
+        Assumes continuous rebalancing and applies a simple taxation model."""
+        effective_rates = self._find_effective_rates(portfolio_weights)
         weights_array = self.get_weights_array(portfolio_weights)
-        yearly_return = weights_array @ interest_rates_array
+        yearly_return = weights_array[np.newaxis, :] @ effective_rates[:, np.newaxis]
         assert len(yearly_return) == 1
         return yearly_return[0, 0]
 
     def get_weights_array(self, portfolio_weights: np.ndarray) -> np.ndarray:
         """Gets the normalized weights array. Includes the current portfolio weights."""
-        weights_array = (portfolio_weights + self.current_portfolio_weights).reshape((1, -1))
+        weights_array = (portfolio_weights + self.current_portfolio_weights)
         weights_array = weights_array / self.weights_scale
         return weights_array
 
@@ -38,6 +44,31 @@ class FinancialModel:
         portfolio_weights_scale = 1.0  # due to optimization constraint
         current_weights_scale = self.current_portfolio_weights.sum()
         return portfolio_weights_scale + current_weights_scale
+
+    def _find_effective_rates(self, portfolio_weights: np.ndarray) -> np.ndarray:
+        """Computes the effective rate due to taxes assuming continuous rebalancing."""
+        taxfree_return = self._find_taxfree_return(portfolio_weights)
+        interest_rates_array = np.array(self.interest_rates)
+        tax_losses = self.tax_rate * np.maximum(0, interest_rates_array - taxfree_return)
+        effective_rates = interest_rates_array - tax_losses
+        return effective_rates
+
+    def _find_taxfree_return(self, portfolio_weights: np.ndarray) -> np.ndarray:
+        weights_array = self.get_weights_array(portfolio_weights)
+        interest_rates_array = np.array(self.interest_rates)
+        taxfree_return = weights_array[np.newaxis, :] @ interest_rates_array[:, np.newaxis]
+        assert len(taxfree_return) == 1
+        taxfree_return = taxfree_return[0, 0]
+        return taxfree_return
+
+    def _find_effective_rates_jacobian(self, portfolio_weights: np.ndarray) -> np.ndarray:
+        """Computes the jacobian of the effective rates w.r.t. the portfolio weights"""
+        taxfree_return = self._find_taxfree_return(portfolio_weights)
+        interest_rates_array = np.array(self.interest_rates)
+        indicator = (interest_rates_array - taxfree_return) > 0.0
+        taxfree_return_jacobian = interest_rates_array / self.weights_scale
+        effective_rates_jacobian = self.tax_rate * taxfree_return_jacobian[:, np.newaxis] @ indicator[np.newaxis, :]
+        return effective_rates_jacobian
 
     def predict_apr(self, portfolio_weights: np.array) -> float:
         yearly_return = self.predict_yearly_return(portfolio_weights)
@@ -59,12 +90,18 @@ class FinancialModel:
         exceedance_value = exceedance_ratio - 1.0
         return exceedance_value
 
-    def predict_yearly_return_jacobian(self) -> np.ndarray:
-        return np.array(self.interest_rates) / self.weights_scale
+    def predict_yearly_return_jacobian(self, portfolio_weights: np.ndarray) -> np.ndarray:
+        effective_rates = self._find_effective_rates(portfolio_weights)
+        effective_rates_jacobian = self._find_effective_rates_jacobian(portfolio_weights)
+        weights_component = effective_rates / self.weights_scale
+        weights_array = self.get_weights_array(portfolio_weights)
+        rates_component = effective_rates_jacobian @ weights_array[:, np.newaxis]
+        yearly_return_jacobian = weights_component + rates_component.reshape(-1)
+        return yearly_return_jacobian
 
     def predict_risk(self, portfolio_weights: np.ndarray) -> float:
         covariance_matrix = np.array(self.covariances)
-        weights_array = self.get_weights_array(portfolio_weights)
+        weights_array = self.get_weights_array(portfolio_weights)[np.newaxis, :]
         risk = weights_array @ covariance_matrix @ weights_array.T
         assert len(risk) == 1
         return risk[0, 0]
@@ -79,8 +116,8 @@ class FinancialModel:
 
     def predict_risk_jacobian(self, portfolio_weights: np.array) -> np.ndarray:
         covariance_matrix = np.array(self.covariances)
-        weights_array = self.get_weights_array(portfolio_weights)
-        risk_gradient = 2 * covariance_matrix @ weights_array.T / self.weights_scale
+        weights_array = self.get_weights_array(portfolio_weights)[:, np.newaxis]
+        risk_gradient = 2 * covariance_matrix @ weights_array / self.weights_scale
         return np.squeeze(risk_gradient)
 
     @property

@@ -105,7 +105,7 @@ class PortfolioOptimizer:
         return notch_loss
 
     def _objective_jacobian(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> np.ndarray:
-        yearly_return_jacobian = self.financial_model.predict_yearly_return_jacobian()
+        yearly_return_jacobian = self.financial_model.predict_yearly_return_jacobian(portfolio_weights)
         risk_jacobian = self.financial_model.predict_risk_jacobian(portfolio_weights)
         obj = -tradeoff_parameter * yearly_return_jacobian + (
                     1. - tradeoff_parameter) * risk_jacobian + self.sparsity_weight * self._notch_jacobian(
@@ -175,7 +175,6 @@ class PortfolioOptimizer:
         risk = self._check_risk(risk)
         interpolated_weights = self.risk_interpolator(risk)
         weights_array = self.financial_model.get_weights_array(interpolated_weights)
-        weights_array = np.squeeze(weights_array)
         portfolio_weights = pd.Series(weights_array, index=self.financial_model.asset_names)
         return portfolio_weights
 
