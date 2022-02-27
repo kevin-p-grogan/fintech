@@ -15,7 +15,7 @@ def main(cfg: Config):
     portfolio_data = munger.load_portfolio_data(cfg.PORTFOLIO_DATA_FILEPATH)
     paths = ResultsPaths(cfg.RESULTS_BASE_DIR)
     portfolio_data.to_csv(paths.data.current_portfolio)
-    financial_model = FinancialModel()
+    financial_model = FinancialModel(tax_rate=cfg.TAX_RATE)
     financial_model.train(data, portfolio_data=portfolio_data, investment_amount=cfg.INVESTMENT_AMOUNT)
     visualizer = Visualizer(paths.plots)
     visualizer.make_financial_model_plots(financial_model, data)
