@@ -1,3 +1,4 @@
+import os.path
 from typing import TypeVar
 
 import yaml
@@ -22,3 +23,9 @@ class Config(dict):
 
         file_config = next(v for k, v in full_config.items() if k in filename)
         return Config(file_config)
+
+    def save(self, filepath: str) -> None:
+        data = {k: v for k, v in self.items()}
+        with open(filepath, "w") as f:
+            yaml.dump(data, f)
+

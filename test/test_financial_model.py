@@ -3,11 +3,11 @@ import unittest
 import numpy as np
 
 from stub_builder import StubBuilder, DataParameters
-from src.data_munger import DataMunger
+from src.data import Munger
 
 
 class TestFinancialModel(unittest.TestCase):
-    _portfolio_data_filepath = "resources/test_portfolio.txt"
+    _portfolio_data_filepath = "resources/test_portfolio.pkl"
 
     EPS: float = 1.e-6
 
@@ -48,16 +48,39 @@ class TestFinancialModel(unittest.TestCase):
         yearly_return = financial_model.predict_yearly_return(portfolio_weights)
         self.assertTrue(np.isclose(yearly_return, 1.0, rtol=0.05))
 
-    def test_predict_yearly_return_jacobian(self):
-        params = [DataParameters("test1", 1.2, 0.02)]
+    def test_yearly_return_is_lower_with_taxes(self):
+        params = [DataParameters("test1", 1.0, 0.0), DataParameters("test2", 0.0, 0.0)]
         financial_model = StubBuilder.create_financial_model(params)
-        portfolio_weights = np.array([1])
-        financial_model._current_portfolio_weights = np.array([10.0])
+        portfolio_weights = np.array([0.5, 0.5])
+        financial_model.tax_rate = 0.0
+        return_without_taxes = financial_model.predict_yearly_return(portfolio_weights)
+        financial_model.tax_rate = 1.0
+        return_with_taxes = financial_model.predict_yearly_return(portfolio_weights)
+        self.assertGreater(return_without_taxes, return_with_taxes)
+
+    def test_predict_yearly_return_jacobian_without_taxes(self):
+        params = [DataParameters("test1", 1.2, 0.02), DataParameters("test2", .7, 0.05)]
+        financial_model = StubBuilder.create_financial_model(params)
+        financial_model.tax_rate = 0.0
+        portfolio_weights = np.array([0.5, 0.5])
+        financial_model._current_portfolio_weights = np.array([1.0, 0.0])
         yearly_return1 = financial_model.predict_yearly_return(portfolio_weights)
         yearly_return2 = financial_model.predict_yearly_return(portfolio_weights + self.EPS)
         finite_difference_jacobian = (yearly_return2 - yearly_return1) / self.EPS
-        predicted_jacobian = financial_model.predict_yearly_return_jacobian()
-        self.assertTrue(np.isclose(finite_difference_jacobian, predicted_jacobian, rtol=1.e-3))
+        predicted_jacobian = financial_model.predict_yearly_return_jacobian(portfolio_weights)
+        self.assertTrue(np.isclose(finite_difference_jacobian, predicted_jacobian.sum(), rtol=1.e-3))
+
+    def test_predict_yearly_return_jacobian_with_taxes(self):
+        params = [DataParameters("test1", 0.5, 0.02), DataParameters("test2", 0.3, 0.01)]
+        financial_model = StubBuilder.create_financial_model(params)
+        financial_model.tax_rate = 0.5
+        portfolio_weights = np.array([0.75, 0.25])
+        financial_model._current_portfolio_weights = np.array([0.0, 0.0])
+        yearly_return1 = financial_model.predict_yearly_return(portfolio_weights)
+        yearly_return2 = financial_model.predict_yearly_return(portfolio_weights + self.EPS)
+        finite_difference_jacobian = (yearly_return2 - yearly_return1) / self.EPS
+        predicted_jacobian = financial_model.predict_yearly_return_jacobian(portfolio_weights)
+        self.assertTrue(np.isclose(finite_difference_jacobian, predicted_jacobian.sum(), rtol=1.e-3))
 
     def test_predict_risk(self):
         variance1 = 0.01
@@ -86,17 +109,22 @@ class TestFinancialModel(unittest.TestCase):
         self.assertTrue(np.isclose(finite_difference_jacobian, predicted_jacobian, rtol=1.e-3))
 
     def test_compute_current_portfolio_weights(self):
-        params = [
-            DataParameters("TEST1", 0.1, 1.e-3),
-            DataParameters("TEST3", 0.2, 2.e-3)
-        ]
+        portfolio_data = Munger().load_portfolio_data(self._portfolio_data_filepath)
+        params = [DataParameters(symbol, 0.1, 1e-3) for symbol in portfolio_data.index]
         financial_model = StubBuilder.create_financial_model(params)
-        data_munger = DataMunger()
-        portfolio_data = data_munger.load_portfolio_data(self._portfolio_data_filepath)
-        current_portfolio_weights = financial_model._compute_current_portfolio_weights(portfolio_data, 10.0)
+        total_equity = portfolio_data["Equity"].sum()
+        current_portfolio_weights = financial_model._compute_current_portfolio_weights(portfolio_data)
         self.assertIsInstance(current_portfolio_weights, np.ndarray)
-        self.assertGreater(current_portfolio_weights.sum(), 1.0)
+        self.assertEqual(current_portfolio_weights.sum(), total_equity)
         self.assertEqual(len(current_portfolio_weights), len(financial_model._interest_rates))
+
+    def test_assets_without_data_are_excluded(self):
+        portfolio_data = Munger().load_portfolio_data(self._portfolio_data_filepath)
+        num_excluded = 2
+        params = [DataParameters(symbol, 0.2, .3) for symbol in portfolio_data.index[num_excluded:]]
+        financial_model = StubBuilder.create_financial_model(params)
+        current_portfolio_weights = financial_model._compute_current_portfolio_weights(portfolio_data)
+        self.assertEqual(len(current_portfolio_weights), len(portfolio_data) - num_excluded)
 
     def test_predict_exceedance_value(self):
         interest_rate = 0.1

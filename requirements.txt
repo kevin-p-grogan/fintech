@@ -21,3 +21,6 @@ threadpoolctl==2.1.0
 urllib3==1.26.6
 yfinance==0.1.63
 PyYAML==6.0
+robin-stocks==2.1.0
+python-dotenv==0.19.2
+pydantic==1.8.2
