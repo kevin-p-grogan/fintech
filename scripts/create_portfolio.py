@@ -19,7 +19,11 @@ def main(cfg: Config):
     financial_model.train(data, portfolio_data=portfolio_data, investment_amount=cfg.INVESTMENT_AMOUNT)
     visualizer = Visualizer(paths.plots)
     visualizer.make_financial_model_plots(financial_model, data)
-    portfolio_optimizer = PortfolioOptimizer(financial_model, sparsity_importance=cfg.SPARSITY_IMPORTANCE)
+    portfolio_optimizer = PortfolioOptimizer(
+        financial_model,
+        sparsity_importance=cfg.SPARSITY_IMPORTANCE,
+        max_portfolio_weight=cfg.MAX_PORTFOLIO_WEIGHT
+    )
     portfolio_optimizer.optimize()
     visualizer.make_portfolio_optimizer_plots(
         portfolio_optimizer,

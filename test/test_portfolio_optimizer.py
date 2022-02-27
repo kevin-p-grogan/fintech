@@ -90,6 +90,26 @@ class TestPortfolioOptimizer(unittest.TestCase):
         weights_sum_to_one = np.allclose(totals, 1.0, atol=self.EPS)
         self.assertTrue(weights_sum_to_one)
 
+    def test_portfolio_weights_below_max(self):
+        params = [DataParameters("test1", 0.1, 0.1), DataParameters("test2", 1.0, 0.01)]
+        portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
+        portfolio_optimizer.max_portfolio_weight = 0.5
+        portfolio_optimizer.optimize()
+        weights = portfolio_optimizer.optimal_weights
+        self.assertTrue(np.allclose(weights["test1"], weights["test2"]))
+
+    def test_invalid_max_portfolio_weight_raises_exception(self):
+        num_assets = 5
+        params = [DataParameters(f"test{i}", 0.1, 0.01) for i in range(num_assets)]
+        financial_model = StubBuilder.create_financial_model(params)
+        invalid_max_portfolio_weight = 1.0 / (2.0 * num_assets)
+        with self.assertRaises(AttributeError):
+            PortfolioOptimizer(financial_model, max_portfolio_weight=invalid_max_portfolio_weight)
+
+        portfolio_optimizer = PortfolioOptimizer(financial_model)
+        with self.assertRaises(AttributeError):
+            portfolio_optimizer.max_portfolio_weight = invalid_max_portfolio_weight
+
 
 if __name__ == '__main__':
     unittest.main()

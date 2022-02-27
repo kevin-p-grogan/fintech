@@ -13,6 +13,7 @@ from src.financial_model import FinancialModel
 class PortfolioOptimizer:
     financial_model: FinancialModel
     _sparsity_importance: float
+    _max_portfolio_weight: float
     _optimal_weights: Optional[pd.DataFrame]
     _optimal_results: Optional[pd.DataFrame]
     _risk_interpolator: Optional[interp1d]
@@ -22,19 +23,33 @@ class PortfolioOptimizer:
     EPS: float = 1.0e-6
     SEED: int = 1337
 
-    def __init__(self, model: FinancialModel, sparsity_importance: float = 0.1):
+    def __init__(self, model: FinancialModel, sparsity_importance: float = 0.1, max_portfolio_weight: float = 1.0):
         self.financial_model = model
         self._sparsity_importance = sparsity_importance
+        self.max_portfolio_weight = max_portfolio_weight
         self._optimal_weights = None
         self._optimal_results = None
         self._risk_interpolator = None
         np.random.seed(self.SEED)
 
+    @property
+    def max_portfolio_weight(self) -> float:
+        return self._max_portfolio_weight
+
+    @max_portfolio_weight.setter
+    def max_portfolio_weight(self, value) -> None:
+        lower_bound = 1.0 / self.financial_model.num_assets
+        if value < lower_bound:
+            raise AttributeError(f"Invalid 'max_portfolio_weight' found. "
+                                 f"Found {value} while the lower bound is {lower_bound}.")
+
+        self._max_portfolio_weight = value
+
     def optimize(self, num_evaluations: int = 11, verbose: bool = True):
         num_weights = self.financial_model.num_assets
         initial_weights = np.random.random(num_weights)
         initial_weights /= initial_weights.sum()
-        constraints = [self._portfolio_weights_sum_to_one, self._no_shorting]
+        constraints = [self._weights_sum_to_one, self._no_shorting, self._weights_less_than_max]
         tradeoff_params = np.linspace(self.LOWER_TRADEOFF_BOUND, self.UPPER_TRADEOFF_BOUND, num_evaluations)
         optimal_weights = []
         optimal_results = []
@@ -61,7 +76,7 @@ class PortfolioOptimizer:
         self._risk_interpolator = interp1d(optimal_risks, self.optimal_weights, axis=0)
 
     @property
-    def _portfolio_weights_sum_to_one(self) -> LinearConstraint:
+    def _weights_sum_to_one(self) -> LinearConstraint:
         num_weights = self.financial_model.num_assets
         lower_bound = 1.0
         upper_bound = 1.0
@@ -73,6 +88,16 @@ class PortfolioOptimizer:
         """Disables shorting of assets but allows selling of current assets."""
         lower_bound = -self.financial_model.current_portfolio_weights
         upper_bound = np.inf
+        constraint_matrix = np.identity(self.financial_model.num_assets)
+        return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
+
+    @property
+    def _weights_less_than_max(self) -> LinearConstraint:
+        """Disables shorting of assets but allows selling of current assets."""
+        current_weights = self.financial_model.current_portfolio_weights
+        normalizing_factor = current_weights.sum() + 1  # assumes _weights_sum_to_one is applied
+        lower_bound = -np.inf
+        upper_bound = self.max_portfolio_weight * normalizing_factor - current_weights
         constraint_matrix = np.identity(self.financial_model.num_assets)
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 

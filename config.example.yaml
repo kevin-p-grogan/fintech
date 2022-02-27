@@ -18,6 +18,7 @@ create_portfolio: # configuration for create_portfolio.py
   PORTFOLIO_VOLATILITY: 0.06
   SPARSITY_IMPORTANCE: 0.0
   TAX_RATE: 0.0
+  MAX_PORTFOLIO_WEIGHT: 1.0
 
   # Plotting
   PRICE_LIMITS: [0.6, 1.4]
