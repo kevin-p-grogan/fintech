@@ -26,6 +26,7 @@ class TestPortfolioOptimizer(unittest.TestCase):
     def test_optimizer_jacobian(self):
         params = [DataParameters("test1", 0.1, 0.02), DataParameters("test2", -0.1, 0.03)]
         portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
+        portfolio_optimizer.financial_model._current_portfolio_weights = np.array([0.6, 0.0])
         portfolio_weights = np.array([-0.5, 1.5])
         obj1 = portfolio_optimizer._objective(portfolio_weights, tradeoff_parameter=0.5)
         obj2 = portfolio_optimizer._objective(portfolio_weights + self.EPS, tradeoff_parameter=0.5)
@@ -34,18 +35,19 @@ class TestPortfolioOptimizer(unittest.TestCase):
         predicted = predicted_jacobian.sum()
         self.assertTrue(np.isclose(finite_difference, predicted, rtol=1.e-3))
 
-    def test_notch_jacobian(self):
+    def test_entropy_jacobian(self):
         params = [DataParameters("test1", 0.15, 0.04), DataParameters("test2", -0.05, 0.02)]
         portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
-        portfolio_weights = np.array([-0.3, 0.7])
-        notch1 = portfolio_optimizer._notch(portfolio_weights)
-        notch2 = portfolio_optimizer._notch(portfolio_weights + self.EPS)
-        finite_difference = (notch2 - notch1) / self.EPS
-        predicted_jacobian = portfolio_optimizer._notch_jacobian(portfolio_weights)
+        portfolio_optimizer.financial_model._current_portfolio_weights = np.array([0.4, 0.0])
+        portfolio_weights = np.array([-0.2, 1.2])
+        entropy1 = portfolio_optimizer._entropy(portfolio_weights)
+        entropy2 = portfolio_optimizer._entropy(portfolio_weights + self.EPS)
+        finite_difference = (entropy2 - entropy1) / self.EPS
+        predicted_jacobian = portfolio_optimizer._entropy_jacobian(portfolio_weights)
         predicted = predicted_jacobian.sum()
         self.assertTrue(np.isclose(finite_difference, predicted, rtol=1.e-3))
 
-    def test_notch_increases_sparsity(self):
+    def test_sparsity_importance_increases_sparsity(self):
         params = [DataParameters(f"test{i}", 0.1, 0.01) for i in range(10)]
         portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
         portfolio_optimizer._sparsity_importance = 0.0

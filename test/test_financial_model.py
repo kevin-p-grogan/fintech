@@ -118,6 +118,14 @@ class TestFinancialModel(unittest.TestCase):
         self.assertEqual(current_portfolio_weights.sum(), total_equity)
         self.assertEqual(len(current_portfolio_weights), len(financial_model._interest_rates))
 
+    def test_assets_without_data_are_excluded(self):
+        portfolio_data = Munger().load_portfolio_data(self._portfolio_data_filepath)
+        num_excluded = 2
+        params = [DataParameters(symbol, 0.2, .3) for symbol in portfolio_data.index[num_excluded:]]
+        financial_model = StubBuilder.create_financial_model(params)
+        current_portfolio_weights = financial_model._compute_current_portfolio_weights(portfolio_data)
+        self.assertEqual(len(current_portfolio_weights), len(portfolio_data) - num_excluded)
+
     def test_predict_exceedance_value(self):
         interest_rate = 0.1
         variance = 0.01
