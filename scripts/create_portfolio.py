@@ -35,6 +35,7 @@ def main(cfg: Config):
     portfolio_update = portfolio_optimizer.get_portfolio_update(cfg.PORTFOLIO_VOLATILITY)
     visualizer.make_portfolio_update_plot(portfolio_update)
     portfolio_optimizer.save_portfolio_update(paths.data.portfolio_weights, portfolio_update, cfg.METADATA_FILEPATH)
+    cfg.save(paths.data.config)
 
 
 if __name__ == "__main__":
