@@ -112,6 +112,54 @@ class TestPortfolioOptimizer(unittest.TestCase):
         with self.assertRaises(AttributeError):
             portfolio_optimizer.max_portfolio_weight = invalid_max_portfolio_weight
 
+    def test_no_assets_are_sold(self):
+        params = [DataParameters("test1", -0.5, 0.1), DataParameters("test2", 0.5, 0.01)]
+        data = StubBuilder.create_test_data(params)
+        records = [
+            PortfolioRecord(
+                symbol="test1",
+                name="test1",
+                shares=1.0,
+                price=1.0,
+                average_cost=3.0,
+                last_transaction='2021-11-30T03:34:10.6153228-02:00'
+            )
+        ]
+        df = PortfolioRecord.convert_records_to_dataframe(records)
+        financial_model = FinancialModel()
+        financial_model.train(data, portfolio_data=df, investment_amount=1.0)
+        portfolio_optimizer = PortfolioOptimizer(financial_model, disable_selling=True)
+        portfolio_optimizer.optimize()
+        bad_asset_not_sold = np.all(portfolio_optimizer.optimal_weights["test1"] > -self.EPS)
+        self.assertTrue(bad_asset_not_sold)
+
+    def test_unsatisfiable_max_weight_constraint_ignored(self):
+        params = [DataParameters("test1", -0.5, 0.01), DataParameters("test2", 0.5, 0.01)]
+        data = StubBuilder.create_test_data(params)
+        records = [
+            PortfolioRecord(
+                symbol="test1",
+                name="test1",
+                shares=1000.0,
+                price=1.0,
+                average_cost=3.0,
+                last_transaction='2021-11-30T03:34:10.6153228-02:00'
+            )
+        ]
+        df = PortfolioRecord.convert_records_to_dataframe(records)
+        financial_model = FinancialModel()
+        financial_model.train(data, portfolio_data=df, investment_amount=1.0)
+        max_portfolio_weight = 0.9
+        portfolio_optimizer = PortfolioOptimizer(
+            financial_model, disable_selling=True, max_portfolio_weight=max_portfolio_weight)
+        portfolio_optimizer.optimize()
+        current_weights = portfolio_optimizer.financial_model.current_portfolio_weights[np.newaxis, ...]
+        optimal_weights = np.array(portfolio_optimizer.optimal_weights)
+        new_weights = current_weights + optimal_weights
+        normalized_weights = new_weights / new_weights.sum(axis=1, keepdims=True)
+        unsatisfiable_max_weight_constraint_ignored = np.any(normalized_weights > max_portfolio_weight)
+        self.assertTrue(unsatisfiable_max_weight_constraint_ignored)
+
 
 if __name__ == '__main__':
     unittest.main()

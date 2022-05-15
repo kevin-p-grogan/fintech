@@ -14,6 +14,7 @@ class PortfolioOptimizer:
     financial_model: FinancialModel
     _sparsity_importance: float
     _max_portfolio_weight: float
+    _disable_selling: True
     _optimal_weights: Optional[pd.DataFrame]
     _optimal_results: Optional[pd.DataFrame]
     _risk_interpolator: Optional[interp1d]
@@ -23,10 +24,14 @@ class PortfolioOptimizer:
     EPS: float = 1.0e-6
     SEED: int = 1337
 
-    def __init__(self, model: FinancialModel, sparsity_importance: float = 0.1, max_portfolio_weight: float = 1.0):
+    def __init__(self, model: FinancialModel,
+                 sparsity_importance: float = 0.1,
+                 max_portfolio_weight: float = 1.0,
+                 disable_selling: bool = False):
         self.financial_model = model
         self._sparsity_importance = sparsity_importance
         self.max_portfolio_weight = max_portfolio_weight
+        self._disable_selling = disable_selling
         self._optimal_weights = None
         self._optimal_results = None
         self._risk_interpolator = None
@@ -49,7 +54,7 @@ class PortfolioOptimizer:
         num_weights = self.financial_model.num_assets
         initial_weights = np.random.random(num_weights)
         initial_weights /= initial_weights.sum()
-        constraints = [self._weights_sum_to_one, self._no_shorting, self._weights_less_than_max]
+        constraints = self._make_constraints()
         tradeoff_params = np.linspace(self.LOWER_TRADEOFF_BOUND, self.UPPER_TRADEOFF_BOUND, num_evaluations)
         optimal_weights = []
         optimal_results = []
@@ -75,6 +80,18 @@ class PortfolioOptimizer:
         optimal_risks = self.optimal_results["Risk"]
         self._risk_interpolator = interp1d(optimal_risks, self.optimal_weights, axis=0)
 
+    def _make_constraints(self) -> list[LinearConstraint]:
+        selling_constraint = self._no_selling if self._disable_selling else self._no_shorting
+        constraints = [self._weights_sum_to_one, selling_constraint]
+        maximal_weights = self._compute_maximal_weights()
+        constraints.append(self._weights_less_than_max)
+        if self._disable_selling and np.any(maximal_weights < 0):
+            warn(f"max_portfolio_weight constraint is not satisfiable. Ignoring.")
+        else:
+            constraints.append(self._weights_less_than_max)
+
+        return constraints
+
     @property
     def _weights_sum_to_one(self) -> LinearConstraint:
         num_weights = self.financial_model.num_assets
@@ -92,14 +109,26 @@ class PortfolioOptimizer:
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 
     @property
-    def _weights_less_than_max(self) -> LinearConstraint:
-        """Disables shorting of assets but allows selling of current assets."""
-        current_weights = self.financial_model.current_portfolio_weights
-        normalizing_factor = current_weights.sum() + 1  # assumes _weights_sum_to_one is applied
-        lower_bound = -np.inf
-        upper_bound = self.max_portfolio_weight * normalizing_factor - current_weights
+    def _no_selling(self) -> LinearConstraint:
+        """Disables the selling of assets."""
+        lower_bound = 0.0
+        upper_bound = np.inf
         constraint_matrix = np.identity(self.financial_model.num_assets)
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
+
+    @property
+    def _weights_less_than_max(self) -> LinearConstraint:
+        """Ensures that all assets are less than a prescribed weight."""
+        lower_bound = -np.inf
+        upper_bound = self._compute_maximal_weights()
+        constraint_matrix = np.identity(self.financial_model.num_assets)
+        return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
+
+    def _compute_maximal_weights(self):
+        current_weights = self.financial_model.current_portfolio_weights
+        normalizing_factor = current_weights.sum() + 1  # assumes _weights_sum_to_one is applied
+        maximal_weights = self.max_portfolio_weight * normalizing_factor - current_weights
+        return maximal_weights
 
     def _objective(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> float:
         yearly_return = self.financial_model.predict_yearly_return(portfolio_weights)
