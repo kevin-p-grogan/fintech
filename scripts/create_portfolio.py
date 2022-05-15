@@ -22,7 +22,8 @@ def main(cfg: Config):
     portfolio_optimizer = PortfolioOptimizer(
         financial_model,
         sparsity_importance=cfg.SPARSITY_IMPORTANCE,
-        max_portfolio_weight=cfg.MAX_PORTFOLIO_WEIGHT
+        max_portfolio_weight=cfg.MAX_PORTFOLIO_WEIGHT,
+        disable_selling=cfg.DISABLE_SELLING
     )
     portfolio_optimizer.optimize()
     visualizer.make_portfolio_optimizer_plots(
