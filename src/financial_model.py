@@ -246,7 +246,7 @@ class FinancialModel:
     @staticmethod
     def _check_portfolio(portfolio: pd.Series):
         portfolio_doesnt_sum_to_one = not np.isclose(portfolio.sum(), 1.0, atol=FinancialModel.EPS)
-        negative_assets_exist = np.any(portfolio < -FinancialModel.EPS)  # assume no negative assets for now
+        negative_assets_exist = np.any(portfolio < -1.0e-3)  # assume no negative assets for now
         if portfolio_doesnt_sum_to_one or negative_assets_exist:
             raise ValueError(f"Invalid portfolio found. "
                              f"Ensure that the portfolio contains only positive assets and that all values sum to one")
