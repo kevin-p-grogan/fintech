@@ -18,6 +18,7 @@ class PortfolioOptimizer:
     _optimal_weights: Optional[pd.DataFrame]
     _optimal_results: Optional[pd.DataFrame]
     _risk_interpolator: Optional[interp1d]
+    _active_assets: Optional[list[str]]
 
     LOWER_TRADEOFF_BOUND: float = 0.0
     UPPER_TRADEOFF_BOUND: float = 1.0
@@ -27,11 +28,13 @@ class PortfolioOptimizer:
     def __init__(self, model: FinancialModel,
                  sparsity_importance: float = 0.1,
                  max_portfolio_weight: float = 1.0,
-                 disable_selling: bool = False):
+                 disable_selling: bool = False,
+                 active_assets: Optional[list[str]] = None):
         self.financial_model = model
         self._sparsity_importance = sparsity_importance
         self.max_portfolio_weight = max_portfolio_weight
         self._disable_selling = disable_selling
+        self._active_assets = active_assets
         self._optimal_weights = None
         self._optimal_results = None
         self._risk_interpolator = None
@@ -90,6 +93,7 @@ class PortfolioOptimizer:
         else:
             constraints.append(self._weights_less_than_max)
 
+        constraints += [] if self._active_assets is None else [self._nonzero_active_weights]
         return constraints
 
     @property
@@ -121,6 +125,16 @@ class PortfolioOptimizer:
         """Ensures that all assets are less than a prescribed weight."""
         lower_bound = -np.inf
         upper_bound = self._compute_maximal_weights()
+        constraint_matrix = np.identity(self.financial_model.num_assets)
+        return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
+
+    @property
+    def _nonzero_active_weights(self) -> LinearConstraint:
+        """Ensures that the only nonzero weights are for the active investments."""
+        lower_bound = np.array(
+            [-np.inf if asset in self._active_assets else 0.0 for asset in self.financial_model.asset_names]
+        )
+        upper_bound = -lower_bound
         constraint_matrix = np.identity(self.financial_model.num_assets)
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 

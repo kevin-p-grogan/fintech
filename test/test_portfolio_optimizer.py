@@ -160,6 +160,14 @@ class TestPortfolioOptimizer(unittest.TestCase):
         unsatisfiable_max_weight_constraint_ignored = np.any(normalized_weights > max_portfolio_weight)
         self.assertTrue(unsatisfiable_max_weight_constraint_ignored)
 
+    def test_only_active_assets_are_bought(self):
+        params = [DataParameters("test1", 1.0, 0.01), DataParameters("test2", 1.0, 0.01)]
+        portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
+        portfolio_optimizer._active_assets = ["test1"]
+        portfolio_optimizer.optimize()
+        inactive_weights_zero = np.allclose(portfolio_optimizer.optimal_weights["test2"], 0.0)
+        self.assertTrue(inactive_weights_zero)
+
 
 if __name__ == '__main__':
     unittest.main()
