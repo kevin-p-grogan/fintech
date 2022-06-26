@@ -148,3 +148,6 @@ metadata.csv
 metadata-*.csv
 data.pkl
 config.yaml
+
+# notebooks
+*.ipynb
