@@ -3,11 +3,11 @@ import os
 from warnings import warn
 
 from scipy.optimize import minimize, LinearConstraint
-from scipy.interpolate import interp1d
 import pandas as pd
 import numpy as np
 
 from src.financial_model import FinancialModel
+from src.risk_interpolator import RiskInterpolator
 
 
 class PortfolioOptimizer:
@@ -17,7 +17,7 @@ class PortfolioOptimizer:
     _disable_selling: True
     _optimal_weights: Optional[pd.DataFrame]
     _optimal_results: Optional[pd.DataFrame]
-    _risk_interpolator: Optional[interp1d]
+    _risk_interpolator: Optional[RiskInterpolator]
     _active_assets: Optional[list[str]]
 
     LOWER_TRADEOFF_BOUND: float = 0.0
@@ -81,7 +81,9 @@ class PortfolioOptimizer:
         optimal_results = np.array(optimal_results)
         self._optimal_results = pd.DataFrame(optimal_results, index=tradeoff_params, columns=["Yearly Return", "Risk"])
         optimal_risks = self.optimal_results["Risk"]
-        self._risk_interpolator = interp1d(optimal_risks, self.optimal_weights, axis=0)
+        self._risk_interpolator = RiskInterpolator(
+            optimal_risks, self.optimal_weights, self.financial_model.covariances
+        )
 
     def _make_constraints(self) -> list[LinearConstraint]:
         selling_constraint = self._no_selling if self._disable_selling else self._no_shorting
@@ -196,7 +198,7 @@ class PortfolioOptimizer:
         return self._optimal_results
 
     @property
-    def risk_interpolator(self) -> interp1d:
+    def risk_interpolator(self) -> RiskInterpolator:
         self._check_property("risk_interpolator")
         return self._risk_interpolator
 
