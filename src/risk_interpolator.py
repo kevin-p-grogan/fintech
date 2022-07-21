@@ -40,7 +40,7 @@ class RiskInterpolator:
         # compute the convex coefficient for the quadratic risk
         r0 = self._sorted_risks.iloc[idx-1]
         r1 = self._sorted_risks.iloc[idx]
-        r01 = self._cross_risks[idx-1]
+        r01 = self._cross_risks.iloc[idx-1]
         a = r0 + r1 - 2.0*r01
         b = 2.0*r01 - 2.0*r0
         c = r0-risk
