@@ -60,13 +60,16 @@ class TestPortfolioOptimizer(unittest.TestCase):
         num_non_sparse_zeros = int((non_sparse_weights.abs() < self.EPS).to_numpy().sum())
         self.assertGreater(num_sparse_zeros, num_non_sparse_zeros)
 
-    def test_get_portfolio_weights(self):
-        params = [DataParameters("test1", 0.1, 0.01), DataParameters("test2", 0.3, 0.05)]
+    def test_intermediately_volatile_weights_are_gotten(self):
+        lower_risk = 0.01
+        higher_risk = 0.05
+        params = [DataParameters("test1", 0.1, lower_risk), DataParameters("test2", 0.3, higher_risk)]
         portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
         portfolio_optimizer.optimize()
-        portfolio_weights = portfolio_optimizer.get_portfolio_weights(0.015)
-        self.assertIsInstance(portfolio_weights, pd.Series)
-        self.assertGreater(portfolio_weights["test1"], portfolio_weights["test2"])
+        intermediate_risk = (lower_risk + higher_risk) / 2.0
+        portfolio_weights = portfolio_optimizer.get_portfolio_weights(intermediate_risk)
+        risk = portfolio_optimizer.financial_model.predict_risk(portfolio_weights.to_numpy())
+        self.assertTrue(lower_risk < risk < higher_risk)
 
     def test_bad_assets_are_sold(self):
         params = [DataParameters("test1", -0.3, 0.1), DataParameters("test2", 0.3, 0.01)]
@@ -162,11 +165,17 @@ class TestPortfolioOptimizer(unittest.TestCase):
 
     def test_only_active_assets_are_bought(self):
         params = [DataParameters("test1", 1.0, 0.01), DataParameters("test2", 1.0, 0.01)]
-        portfolio_optimizer = StubBuilder.create_portfolio_optimzer(params)
-        portfolio_optimizer._active_assets = ["test1"]
+        financial_model = StubBuilder.create_financial_model(params)
+        portfolio_optimizer = PortfolioOptimizer(financial_model, active_assets=["test1"])
         portfolio_optimizer.optimize()
         inactive_weights_zero = np.allclose(portfolio_optimizer.optimal_weights["test2"], 0.0)
         self.assertTrue(inactive_weights_zero)
+
+    def test_unmodeled_asset_raises_exception(self):
+        params = [DataParameters("test1", 1.0, 0.0)]
+        financial_model = StubBuilder.create_financial_model(params)
+        with self.assertRaises(ValueError):
+            PortfolioOptimizer(financial_model, active_assets=["test1", "test2", "test3"])
 
 
 if __name__ == '__main__':

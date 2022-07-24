@@ -14,11 +14,12 @@ class PortfolioOptimizer:
     financial_model: FinancialModel
     _sparsity_importance: float
     _max_portfolio_weight: float
-    _disable_selling: True
+    _disable_selling: bool
     _optimal_weights: Optional[pd.DataFrame]
     _optimal_results: Optional[pd.DataFrame]
     _risk_interpolator: Optional[RiskInterpolator]
     _active_assets: Optional[list[str]]
+    _active_asset_indices: Optional[np.ndarray] = None
 
     LOWER_TRADEOFF_BOUND: float = 0.0
     UPPER_TRADEOFF_BOUND: float = 1.0
@@ -32,13 +33,23 @@ class PortfolioOptimizer:
                  active_assets: Optional[list[str]] = None):
         self.financial_model = model
         self._sparsity_importance = sparsity_importance
-        self.max_portfolio_weight = max_portfolio_weight
         self._disable_selling = disable_selling
-        self._active_assets = active_assets
+        self._set_active_assets(active_assets)
+        self.max_portfolio_weight = max_portfolio_weight
         self._optimal_weights = None
         self._optimal_results = None
         self._risk_interpolator = None
         np.random.seed(self.SEED)
+
+    def _set_active_assets(self, active_assets) -> None:
+        self._active_assets = active_assets if active_assets is not None else self.financial_model.asset_names
+        unmodeled = [aa for aa in self._active_assets if aa not in self.financial_model.asset_names]
+        if unmodeled:
+            raise ValueError(f"Active assets need to be a subset of the modeled assets. "
+                             f"The following assets are not modeled: {', '.join(unmodeled)}.")
+
+        self._active_asset_indices = np.array([a in self._active_assets for a in self.financial_model.asset_names])
+        self._num_weights = len(self._active_assets)
 
     @property
     def max_portfolio_weight(self) -> float:
@@ -46,7 +57,7 @@ class PortfolioOptimizer:
 
     @max_portfolio_weight.setter
     def max_portfolio_weight(self, value) -> None:
-        lower_bound = 1.0 / self.financial_model.num_assets
+        lower_bound = 1.0 / self._num_weights
         if value < lower_bound:
             raise AttributeError(f"Invalid 'max_portfolio_weight' found. "
                                  f"Found {value} while the lower bound is {lower_bound}.")
@@ -54,9 +65,7 @@ class PortfolioOptimizer:
         self._max_portfolio_weight = value
 
     def optimize(self, num_evaluations: int = 11, verbose: bool = True):
-        num_weights = self.financial_model.num_assets
-        initial_weights = np.random.random(num_weights)
-        initial_weights /= initial_weights.sum()
+        initial_weights = self._make_initial_weights()
         constraints = self._make_constraints()
         tradeoff_params = np.linspace(self.LOWER_TRADEOFF_BOUND, self.UPPER_TRADEOFF_BOUND, num_evaluations)
         optimal_weights = []
@@ -70,20 +79,37 @@ class PortfolioOptimizer:
             if verbose:
                 print("Finished optimization")
 
-            optimal_weights.append(list(result.x))
-            risk = self.financial_model.predict_risk(result.x)
-            yearly_return = self.financial_model.predict_yearly_return(result.x)
+            weights = self._add_inactive_assets(result.x)
+            optimal_weights.append(list(weights))
+            risk = self.financial_model.predict_risk(weights)
+            yearly_return = self.financial_model.predict_yearly_return(weights)
             optimal_results.append([yearly_return, risk])
 
+        self._store_results(optimal_results, optimal_weights, tradeoff_params)
+        self._risk_interpolator = RiskInterpolator(
+            self.optimal_results["Risk"], self.optimal_weights, self.financial_model.covariances
+        )
+
+    def _add_inactive_assets(self, weights: np.ndarray) -> np.ndarray:
+        """Returns a weight array with inactive asset weights set to zero."""
+        all_weights = np.zeros(self.financial_model.num_assets)
+        all_weights[self._active_asset_indices] = weights
+        return all_weights
+
+    def _remove_inactive_assets(self, weights: np.ndarray) -> np.ndarray:
+        return weights[self._active_asset_indices]
+
+    def _store_results(self, optimal_results: list[list[float]], optimal_weights, tradeoff_params) -> None:
         optimal_weights = np.array(optimal_weights)
         self._optimal_weights = pd.DataFrame(optimal_weights, index=tradeoff_params,
                                              columns=self.financial_model.asset_names)
         optimal_results = np.array(optimal_results)
         self._optimal_results = pd.DataFrame(optimal_results, index=tradeoff_params, columns=["Yearly Return", "Risk"])
-        optimal_risks = self.optimal_results["Risk"]
-        self._risk_interpolator = RiskInterpolator(
-            optimal_risks, self.optimal_weights, self.financial_model.covariances
-        )
+
+    def _make_initial_weights(self) -> np.ndarray:
+        initial_weights = np.random.random(self._num_weights)
+        initial_weights /= initial_weights.sum()
+        return initial_weights
 
     def _make_constraints(self) -> list[LinearConstraint]:
         selling_constraint = self._no_selling if self._disable_selling else self._no_shorting
@@ -95,23 +121,21 @@ class PortfolioOptimizer:
         else:
             constraints.append(self._weights_less_than_max)
 
-        constraints += [] if self._active_assets is None else [self._nonzero_active_weights]
         return constraints
 
     @property
     def _weights_sum_to_one(self) -> LinearConstraint:
-        num_weights = self.financial_model.num_assets
         lower_bound = 1.0
         upper_bound = 1.0
-        constraint_matrix = np.ones((1, num_weights))
+        constraint_matrix = np.ones((1, self._num_weights))
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 
     @property
     def _no_shorting(self) -> LinearConstraint:
-        """Disables shorting of assets but allows selling of current assets."""
-        lower_bound = -self.financial_model.current_portfolio_weights
+        """Disables shorting of assets but allows selling of current active assets."""
+        lower_bound = -self._remove_inactive_assets(self.financial_model.current_portfolio_weights)
         upper_bound = np.inf
-        constraint_matrix = np.identity(self.financial_model.num_assets)
+        constraint_matrix = np.identity(self._num_weights)
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 
     @property
@@ -119,7 +143,7 @@ class PortfolioOptimizer:
         """Disables the selling of assets."""
         lower_bound = 0.0
         upper_bound = np.inf
-        constraint_matrix = np.identity(self.financial_model.num_assets)
+        constraint_matrix = np.identity(self._num_weights)
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 
     @property
@@ -127,28 +151,19 @@ class PortfolioOptimizer:
         """Ensures that all assets are less than a prescribed weight."""
         lower_bound = -np.inf
         upper_bound = self._compute_maximal_weights()
-        constraint_matrix = np.identity(self.financial_model.num_assets)
-        return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
-
-    @property
-    def _nonzero_active_weights(self) -> LinearConstraint:
-        """Ensures that the only nonzero weights are for the active investments."""
-        lower_bound = np.array(
-            [-np.inf if asset in self._active_assets else 0.0 for asset in self.financial_model.asset_names]
-        )
-        upper_bound = -lower_bound
-        constraint_matrix = np.identity(self.financial_model.num_assets)
+        constraint_matrix = np.identity(self._num_weights)
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
 
     def _compute_maximal_weights(self):
-        current_weights = self.financial_model.current_portfolio_weights
+        current_weights = self._remove_inactive_assets(self.financial_model.current_portfolio_weights)
         normalizing_factor = current_weights.sum() + 1  # assumes _weights_sum_to_one is applied
         maximal_weights = self.max_portfolio_weight * normalizing_factor - current_weights
         return maximal_weights
 
     def _objective(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> float:
-        yearly_return = self.financial_model.predict_yearly_return(portfolio_weights)
-        risk = self.financial_model.predict_risk(portfolio_weights)
+        all_portfolio_weights = self._add_inactive_assets(portfolio_weights)
+        yearly_return = self.financial_model.predict_yearly_return(all_portfolio_weights)
+        risk = self.financial_model.predict_risk(all_portfolio_weights)
         obj = -tradeoff_parameter * yearly_return + (
                     1. - tradeoff_parameter) * risk + self.sparsity_weight * self._entropy(portfolio_weights)
         return obj
@@ -159,27 +174,32 @@ class PortfolioOptimizer:
         max_objective = max(self.financial_model.maximum_yearly_return, self.financial_model.minimum_risk)
         min_objective = min(self.financial_model.maximum_yearly_return, self.financial_model.minimum_risk)
         objective_scale = max_objective - min_objective
-        entropy_scale = np.log(self.financial_model.num_assets)
+        entropy_scale = np.log(self._num_weights)
         return self._sparsity_importance * objective_scale / entropy_scale
 
     def _entropy(self, portfolio_weights: np.ndarray) -> float:
         """Computes the entropy of the portfolio. Assumes that the _no_shorting constraint is enforced."""
-        current_weights = self.financial_model.current_portfolio_weights
+        current_weights = self._remove_inactive_assets(self.financial_model.current_portfolio_weights)
         normalizing_factor = current_weights.sum() + 1  # assumes _weights_sum_to_one is applied
         probabilities = (portfolio_weights + current_weights) / normalizing_factor
         smoothed_probabilities = np.maximum(probabilities, PortfolioOptimizer.EPS)
         return -float(np.sum(smoothed_probabilities * np.log(smoothed_probabilities)))
 
     def _objective_jacobian(self, portfolio_weights: np.ndarray, tradeoff_parameter: float) -> np.ndarray:
-        yearly_return_jacobian = self.financial_model.predict_yearly_return_jacobian(portfolio_weights)
-        risk_jacobian = self.financial_model.predict_risk_jacobian(portfolio_weights)
+        all_portfolio_weights = self._add_inactive_assets(portfolio_weights)
+        yearly_return_jacobian = self._remove_inactive_assets(
+            self.financial_model.predict_yearly_return_jacobian(all_portfolio_weights)
+        )
+        risk_jacobian = self._remove_inactive_assets(
+            self.financial_model.predict_risk_jacobian(all_portfolio_weights)
+        )
         sparsity_jacobian = self._entropy_jacobian(portfolio_weights)
         obj = -tradeoff_parameter * yearly_return_jacobian + (
                     1. - tradeoff_parameter) * risk_jacobian + self.sparsity_weight * sparsity_jacobian
         return obj
 
     def _entropy_jacobian(self, portfolio_weights: np.ndarray) -> np.ndarray:
-        current_weights = self.financial_model.current_portfolio_weights
+        current_weights = self._remove_inactive_assets(self.financial_model.current_portfolio_weights)
         normalizing_factor = current_weights.sum() + 1  # assumes _weights_sum_to_one is applied
         probabilities = (portfolio_weights + current_weights) / normalizing_factor
         smoothed_probabilities = np.maximum(probabilities, PortfolioOptimizer.EPS)
@@ -240,7 +260,7 @@ class PortfolioOptimizer:
     def get_portfolio_weights(self, risk: float) -> pd.Series:
         risk = self._check_risk(risk)
         interpolated_weights = self.risk_interpolator(risk)
-        weights_array = self.financial_model.get_weights_array(interpolated_weights)
+        weights_array = self.financial_model.get_weights_array(interpolated_weights.to_numpy())
         portfolio_weights = pd.Series(weights_array, index=self.financial_model.asset_names)
         return portfolio_weights
 
