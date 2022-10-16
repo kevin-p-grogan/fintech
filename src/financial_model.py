@@ -15,13 +15,16 @@ class FinancialModel:
     _interest_rates: Optional[pd.Series] = None
     _covariances: Optional[pd.DataFrame] = None
     _current_portfolio_weights: Optional[np.ndarray] = None
+    _is_loser: Optional[pd.Series] = None
     _minimum_risk: Optional[float] = None
 
     PORTFOLIO_VALUE_COLUMN: str = "Equity"
+    PORTFOLIO_RETURN_COLUMN: str = "Total Return"
     EPS: float = 1.0e-6
 
-    def __init__(self, tax_rate: float = 0.0):
+    def __init__(self, tax_rate: float = 0.0, sell_only_losers: bool = False):
         self.tax_rate = tax_rate
+        self._sell_only_losers = sell_only_losers
 
     def predict_yearly_return(self, portfolio_weights: np.array) -> float:
         """Computes the yearly median return compounded continuously.
@@ -137,6 +140,7 @@ class FinancialModel:
         if portfolio_data is not None and investment_amount is not None:
             print(f"Incorporating current portfolio into calculations.")
             self._current_portfolio_weights = self._compute_current_portfolio_weights(portfolio_data, investment_amount)
+            self._is_loser = self._determine_losers(portfolio_data)
         elif portfolio_data is None and investment_amount is None:
             print("No current portfolio data inputted. Not incorporating current investments.")
         else:
@@ -154,7 +158,8 @@ class FinancialModel:
 
         self._interest_rates = pd.Series(interest_rates, symbols)
 
-    def _find_interest_rate(self, times: pd.Series, prices: pd.Series) -> float:
+    @staticmethod
+    def _find_interest_rate(times: pd.Series, prices: pd.Series) -> float:
         """Computes interest rates according to geometric Brownian motion."""
         lr = LinearRegression(fit_intercept=False)
         price_array = prices.to_numpy()
@@ -195,6 +200,14 @@ class FinancialModel:
         current_portfolio_weights = pd.Series(np.zeros_like(self.asset_names, dtype=float), index=self.asset_names)
         current_portfolio_weights[symbols] = values
         return current_portfolio_weights.to_numpy()
+
+    def _determine_losers(self, portfolio_data: pd.DataFrame) -> pd.Series:
+        symbols = self._get_current_portfolio_symbols(portfolio_data)
+        returns = portfolio_data.loc[symbols, self.PORTFOLIO_RETURN_COLUMN]
+        is_negative_return = returns < 0
+        is_loser = pd.Series(np.zeros_like(self.asset_names, dtype=bool), index=self.asset_names)
+        is_loser[symbols] = is_negative_return
+        return is_loser
 
     def _get_current_portfolio_symbols(self, portfolio_data: pd.DataFrame) -> set:
         trained_symbols = set(self.asset_names)
@@ -263,3 +276,9 @@ class FinancialModel:
         if self._minimum_risk is None:
             raise AttributeError("Minimum risk of portfolio are not available. Make sure to train model first.")
         return self._minimum_risk
+
+    @property
+    def is_loser(self) -> pd.Series:
+        if self._is_loser is None:
+            raise AttributeError("Losers not available. Make sure to train with portfolio data first.")
+        return self._is_loser

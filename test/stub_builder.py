@@ -27,6 +27,15 @@ class StubBuilder:
         return financial_model
 
     @staticmethod
+    def create_financial_model_with_portfolio(
+            params: List[DataParameters],
+            portfolio_data: pd.DataFrame) -> FinancialModel:
+        data = StubBuilder.create_test_data(params)
+        financial_model = FinancialModel()
+        financial_model.train(data, portfolio_data=portfolio_data, investment_amount=100)
+        return financial_model
+
+    @staticmethod
     def create_test_data(params: List[DataParameters]) -> pd.DataFrame:
         """Create data according to geometric Brownian motion model."""
         num_times = 10000

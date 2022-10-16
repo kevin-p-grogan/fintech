@@ -20,6 +20,7 @@ class PortfolioOptimizer:
     _risk_interpolator: Optional[RiskInterpolator]
     _active_assets: Optional[list[str]]
     _active_asset_indices: Optional[np.ndarray] = None
+    _sell_only_losers: bool
 
     LOWER_TRADEOFF_BOUND: float = 0.0
     UPPER_TRADEOFF_BOUND: float = 1.0
@@ -30,7 +31,8 @@ class PortfolioOptimizer:
                  sparsity_importance: float = 0.1,
                  max_portfolio_weight: float = 1.0,
                  disable_selling: bool = False,
-                 active_assets: Optional[list[str]] = None):
+                 active_assets: Optional[list[str]] = None,
+                 sell_only_losers: bool = False):
         self.financial_model = model
         self._sparsity_importance = sparsity_importance
         self._disable_selling = disable_selling
@@ -39,6 +41,7 @@ class PortfolioOptimizer:
         self._optimal_weights = None
         self._optimal_results = None
         self._risk_interpolator = None
+        self._sell_only_losers = sell_only_losers
         np.random.seed(self.SEED)
 
     def _set_active_assets(self, active_assets) -> None:
@@ -96,8 +99,8 @@ class PortfolioOptimizer:
         all_weights[self._active_asset_indices] = weights
         return all_weights
 
-    def _remove_inactive_assets(self, weights: np.ndarray) -> np.ndarray:
-        return weights[self._active_asset_indices]
+    def _remove_inactive_assets(self, assets: np.ndarray) -> np.ndarray:
+        return assets[self._active_asset_indices]
 
     def _store_results(self, optimal_results: list[list[float]], optimal_weights, tradeoff_params) -> None:
         optimal_weights = np.array(optimal_weights)
@@ -112,7 +115,12 @@ class PortfolioOptimizer:
         return initial_weights
 
     def _make_constraints(self) -> list[LinearConstraint]:
-        selling_constraint = self._no_selling if self._disable_selling else self._no_shorting
+        selling_constraint = self._no_shorting
+        if self._disable_selling:
+            selling_constraint = self._no_selling
+        elif self._sell_only_losers:
+            selling_constraint = self._only_sell_losers
+
         constraints = [self._weights_sum_to_one, selling_constraint]
         maximal_weights = self._compute_maximal_weights()
         constraints.append(self._weights_less_than_max)
@@ -134,6 +142,16 @@ class PortfolioOptimizer:
     def _no_shorting(self) -> LinearConstraint:
         """Disables shorting of assets but allows selling of current active assets."""
         lower_bound = -self._remove_inactive_assets(self.financial_model.current_portfolio_weights)
+        upper_bound = np.inf
+        constraint_matrix = np.identity(self._num_weights)
+        return LinearConstraint(constraint_matrix, lower_bound, upper_bound)
+
+    @property
+    def _only_sell_losers(self) -> LinearConstraint:
+        """Disables shorting and only sell loser assets."""
+        lower_bound = -self._remove_inactive_assets(self.financial_model.current_portfolio_weights)
+        is_winner = ~self._remove_inactive_assets(self.financial_model.is_loser.to_numpy())
+        lower_bound[is_winner] = 0.0
         upper_bound = np.inf
         constraint_matrix = np.identity(self._num_weights)
         return LinearConstraint(constraint_matrix, lower_bound, upper_bound)

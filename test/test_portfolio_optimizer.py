@@ -1,15 +1,15 @@
 import unittest
 
 import numpy as np
-import pandas as pd
 
 from stub_builder import StubBuilder, DataParameters
-from src.data import PortfolioRecord
+from src.data import PortfolioRecord, Munger
 from src.financial_model import FinancialModel
 from src.portfolio_optimizer import PortfolioOptimizer
 
 
 class TestPortfolioOptimizer(unittest.TestCase):
+    _portfolio_data_filepath = "resources/test_portfolio.pkl"
     EPS: float = 1.e-6
 
     def test_optimize(self):
@@ -176,6 +176,19 @@ class TestPortfolioOptimizer(unittest.TestCase):
         financial_model = StubBuilder.create_financial_model(params)
         with self.assertRaises(ValueError):
             PortfolioOptimizer(financial_model, active_assets=["test1", "test2", "test3"])
+
+    def test_winners_are_not_sold(self):
+        portfolio_data = Munger().load_portfolio_data(self._portfolio_data_filepath)
+        row_iter = portfolio_data.iterrows()
+        first_positive_return_sym = next(sym for sym, row in row_iter if row["Total Return"] > 0)
+        second_positive_return_sym = next(sym for sym, row in row_iter if row["Total Return"] > 0)
+        portfolio_data = portfolio_data.loc[[first_positive_return_sym, second_positive_return_sym]]
+        params = [DataParameters(sym, 2.0*(-1)**i, .001) for i, sym in enumerate(portfolio_data.index)]
+        financial_model = StubBuilder.create_financial_model_with_portfolio(params, portfolio_data)
+        portfolio_optimizer = PortfolioOptimizer(financial_model, sell_only_losers=True)
+        portfolio_optimizer.optimize()
+        no_assets_are_sold = np.all(portfolio_optimizer.optimal_weights > -self.EPS)
+        self.assertTrue(no_assets_are_sold)
 
 
 if __name__ == '__main__':

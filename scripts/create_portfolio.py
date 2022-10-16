@@ -24,7 +24,8 @@ def main(cfg: Config):
         sparsity_importance=cfg.SPARSITY_IMPORTANCE,
         max_portfolio_weight=cfg.MAX_PORTFOLIO_WEIGHT,
         disable_selling=cfg.DISABLE_SELLING,
-        active_assets=cfg.ACTIVE_ASSETS
+        active_assets=cfg.ACTIVE_ASSETS,
+        sell_only_losers=cfg.SELL_ONLY_LOSERS,
     )
     portfolio_optimizer.optimize()
     visualizer.make_portfolio_optimizer_plots(

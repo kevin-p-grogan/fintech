@@ -149,6 +149,14 @@ class TestFinancialModel(unittest.TestCase):
         ev = financial_model.predict_exceedance_value(portfolio_weights, time=1, exceedance_probability=0.5)
         self.assertTrue(np.isclose(interest_rate, ev, atol=0.01))
 
+    def test_losers_are_found(self):
+        portfolio_data = Munger().load_portfolio_data(self._portfolio_data_filepath)
+        params = [DataParameters(symbol, 0.1, .001) for symbol in portfolio_data.index]
+        financial_model = StubBuilder.create_financial_model_with_portfolio(params, portfolio_data)
+        losers = financial_model.is_loser
+        expected_losers = portfolio_data["Total Return"] < 0
+        self.assertTrue(np.all(losers == expected_losers))
+
 
 if __name__ == '__main__':
     unittest.main()

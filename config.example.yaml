@@ -20,6 +20,7 @@ create_portfolio: # configuration for create_portfolio.py
   TAX_RATE: 0.0
   MAX_PORTFOLIO_WEIGHT: 1.0
   DISABLE_SELLING: false
+  SELL_ONLY_LOSERS: false
   ACTIVE_ASSETS: # only the following assets will be active.
     - "XXX"
     - "YYY"
